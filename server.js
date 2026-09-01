@@ -247,6 +247,16 @@ app.use(session({
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Nonaktifkan cache untuk file statis agar browser selalu memuat versi terbaru
+app.use((req, res, next) => {
+  if (req.path === '/' || /\.(html|js|css)$/.test(req.path)) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Auth helpers ---
@@ -284,6 +294,16 @@ function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Akses khusus admin.' });
   next();
 }
+
+// Logging diagnostik untuk permintaan API (membantu men-debug masalah login/preview)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    const token = extractToken(req);
+    const u = currentUser(req);
+    console.log(`[REQ] ${req.method} ${req.path} | token=${token ? 'ya' : 'tidak'} | session=${req.session && req.session.userId ? 'ya' : 'tidak'} | user=${u ? u.username : 'null'}`);
+  }
+  next();
+});
 
 // --- Auth API ---
 app.post('/api/login', (req, res) => {

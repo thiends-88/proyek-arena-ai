@@ -19,6 +19,7 @@ const PALETTE = ['#0f766e', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6
 
 const state = {
   user: null,
+  token: null,
   view: 'dashboard',
   charts: {},
   pelanggan: [],
@@ -48,15 +49,35 @@ function toast(msg, type = 'success') {
 }
 
 function authedUrl(path) {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   if (!token) return path;
   return path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token);
 }
 
+// Penyimpanan token yang aman: in-memory (state.token) + localStorage (jika tersedia).
+// Di dalam iframe preview, akses localStorage bisa diblokir; fallback in-memory memastikan
+// login tetap berfungsi selama sesi halaman tidak di-reload.
+function getToken() {
+  if (state.token) return state.token;
+  try { return localStorage.getItem('token') || null; } catch (e) { return null; }
+}
+function setToken(t) {
+  state.token = t || null;
+  try {
+    if (t) localStorage.setItem('token', t);
+    else localStorage.removeItem('token');
+  } catch (e) { /* localStorage tidak tersedia — abaikan */ }
+}
+
 async function api(path, opts = {}) {
   const headers = {};
-  const token = localStorage.getItem('token');
-  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
+    // Fallback: sertakan token via query string juga, untuk berjaga-jaga bila proxy
+    // preview menghapus header Authorization.
+    path = authedUrl(path);
+  }
   if (opts.body && !(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const res = await fetch(path, { ...opts, headers });
   let data = null;
@@ -64,9 +85,9 @@ async function api(path, opts = {}) {
   if (!res.ok) {
     const err = new Error((data && data.error) || 'Terjadi kesalahan (' + res.status + ')');
     err.status = res.status;
-    if (res.status === 401 && path !== '/api/login' && path !== '/api/me') {
+    if (res.status === 401 && path !== '/api/login' && !/\/api\/me$/.test(path)) {
       // sesi kedaluwarsa → kembali ke login
-      localStorage.removeItem('token');
+      setToken(null);
       state.user = null;
       $('#app').classList.add('hidden');
       $('#login-screen').classList.remove('hidden');
@@ -123,7 +144,7 @@ async function doLogin(e) {
   errEl.classList.add('hidden');
   try {
     const { user, token } = await api('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
-    if (token) localStorage.setItem('token', token);
+    if (token) setToken(token);
     state.user = user;
     showApp();
     toast('Selamat datang, ' + user.name + '!');
@@ -135,7 +156,7 @@ async function doLogin(e) {
 
 async function doLogout() {
   try { await api('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
-  localStorage.removeItem('token');
+  setToken(null);
   state.user = null;
   state.pelanggan = [];
   state.kolektor = [];
@@ -685,7 +706,7 @@ async function init() {
     state.user = user;
     showApp();
   } catch (e) {
-    localStorage.removeItem('token');
+    setToken(null);
     $('#login-screen').classList.remove('hidden');
   }
 }
