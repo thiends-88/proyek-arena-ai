@@ -260,6 +260,7 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
   animation: pop .18s ease;
 }
 .modal.wide { max-width: 700px; }
+.modal.xwide { max-width: 1120px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--line); }
 .modal-head h3 { font-size: 16.5px; }
 .modal-body { padding: 20px 22px; }

@@ -174,13 +174,14 @@ function downloadTemplate() {
     <div class="modal-head"><h3>📥 Template Import</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
       <div class="hint" style="margin-bottom:10px">
-        Salin teks di bawah lalu tempel ke Excel/Notepad (simpan sebagai <code>.csv</code>), atau unduh langsung sebagai file CSV.
+        ⚠️ Di lingkungan preview, unduhan sering diblokir. Cara paling andal: klik
+        <strong>📋 Salin Semua</strong>, lalu tempel (paste) ke Excel/Notepad dan simpan sebagai <code>.csv</code>.
       </div>
       <textarea class="input" id="tpl-csv" rows="7" readonly style="font-family:monospace;font-size:12px;white-space:pre">${esc(csv)}</textarea>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-outline" id="tpl-copy">📋 Salin Semua</button>
-      <button class="btn btn-primary" id="tpl-download">⬇️ Unduh CSV</button>
+      <button class="btn btn-outline" id="tpl-download">⬇️ Unduh CSV</button>
+      <button class="btn btn-primary" id="tpl-copy">📋 Salin Semua</button>
     </div>`);
   $('#tpl-copy').addEventListener('click', async () => {
     const ok = await copyText(csv);
@@ -207,11 +208,11 @@ const kelompokBadge = (s) => {
 };
 
 /* ---------- Modal helpers ---------- */
-function openModal(html, wide = false) {
+function openModal(html, size = '') {
   closeModal();
   const root = $('#modal-root');
   root.innerHTML = `<div class="modal-backdrop">
-      <div class="modal ${wide ? 'wide' : ''}">${html}</div>
+      <div class="modal ${size}">${html}</div>
     </div>`;
   root.querySelector('.modal-backdrop').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
   return root;
@@ -528,31 +529,39 @@ async function exportPDF(id) {
   const k = state.kolektor.find((x) => x.id === id);
   const uname = k ? k.username : id;
   const fname = 'laporan-' + uname + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+  const htmlUrl = authedUrl('/api/export/' + id + '/html');
 
-  let blob;
-  try {
-    blob = await fetchBlob('/api/export/' + id + '/pdf');
-  } catch (e) { toast(e.message, 'error'); return; }
-
-  // coba unduh otomatis (best-effort)
-  try { saveBlob(blob, fname); } catch (e) { /* abaikan, ada opsi lain di modal */ }
-
-  // objectURL untuk pratinjau & buka di tab baru
-  const objUrl = URL.createObjectURL(blob);
-  const openUrl = authedUrl('/api/export/' + id + '/pdf?view=1');
   openModal(`
-    <div class="modal-head"><h3>📄 Laporan PDF Siap</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-head"><h3>📄 Laporan Data Pelanggan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
-      <div class="hint" style="margin-bottom:12px">${esc(fname)} — jika file tidak terunduh otomatis, gunakan salah satu opsi di bawah:</div>
-      <iframe id="pdf-preview" src="${objUrl}" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:10px;background:#f8fafc"></iframe>
+      <div class="hint" style="margin-bottom:10px">
+        Laporan tampil di bawah. Untuk menyimpannya, klik <strong>🖨️ Print / Simpan PDF</strong> lalu pilih <em>Save as PDF</em> pada dialog cetak.
+      </div>
+      <iframe id="report-frame" src="${htmlUrl}" style="width:100%;height:66vh;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-outline" onclick="window.open('${openUrl}', '_blank')">🔗 Buka di Tab Baru</button>
-      <button class="btn btn-primary" id="pdf-retry">⬇️ Unduh File</button>
-    </div>`);
-  $('#pdf-retry').addEventListener('click', () => {
-    saveBlob(blob, fname);
-    toast('Mengunduh ' + fname + '…');
+      <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>
+      <button class="btn btn-accent" id="rep-download">⬇️ Unduh PDF</button>
+      <button class="btn btn-primary" id="rep-print">🖨️ Print / Simpan PDF</button>
+    </div>`, 'xwide');
+
+  $('#rep-print').addEventListener('click', () => {
+    const f = document.getElementById('report-frame');
+    if (f && f.contentWindow) {
+      f.contentWindow.focus();
+      setTimeout(() => {
+        try { f.contentWindow.print(); }
+        catch (e) { toast('Tidak bisa mencetak di lingkungan ini. Coba tombol "Unduh PDF".', 'error'); }
+      }, 300);
+    }
+  });
+
+  $('#rep-download').addEventListener('click', async () => {
+    try {
+      const blob = await fetchBlob('/api/export/' + id + '/pdf');
+      saveBlob(blob, fname);
+      toast('Mengunduh ' + fname + '… Jika tidak muncul, gunakan "Print / Simpan PDF".');
+    } catch (e) { toast(e.message, 'error'); }
   });
 }
 

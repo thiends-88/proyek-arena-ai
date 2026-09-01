@@ -149,6 +149,12 @@ function publicUser(u) {
   return { id: u.id, username: u.username, name: u.name, role: u.role };
 }
 
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ---------------------------------------------------------------------------
 // Seed data awal
 // ---------------------------------------------------------------------------
@@ -630,6 +636,88 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     .slice(0, 8)
     .map((m) => ({ ...m, pelangganNama: names[m.pelangganId] || '-', kolektorNama: users[m.kolektorId] || '-' }));
   res.json(data);
+});
+
+// --- Export HTML (tampilan laporan di halaman, bisa dicetak/simpan sebagai PDF) ---
+app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) => {
+  const k = db.users.find((u) => u.id === req.params.kolektorId && u.role === 'kolektor');
+  if (!k) return res.status(404).json({ error: 'Kolektor tidak ditemukan.' });
+  const pelanggan = db.pelanggan.filter((p) => p.kolektorId === k.id);
+  const a = aggregate(pelanggan);
+  const today = new Date().toLocaleString('id-ID', { dateStyle: 'long' });
+
+  const rows = pelanggan.map((p, i) => `
+    <tr>
+      <td class="c">${i + 1}</td>
+      <td>${escHtml(p.id)}</td>
+      <td>${escHtml(p.nama)}</td>
+      <td>${escHtml(p.noHp)}</td>
+      <td><span class="pill pill-${escHtml(p.status)}">${escHtml(p.status)}</span></td>
+      <td>${escHtml(p.infrastruktur)}</td>
+      <td>${escHtml(p.tagihan)}</td>
+      <td>${escHtml(p.kelompok)}</td>
+      <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laporan ${escHtml(k.name)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; background: #fff; }
+  .head { border-bottom: 3px solid #0f766e; padding-bottom: 12px; margin-bottom: 16px; }
+  .head h1 { margin: 0; font-size: 20px; }
+  .head p { margin: 2px 0; font-size: 13px; color: #334155; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 16px; font-size: 13px; }
+  .meta b { color: #0f766e; }
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .card { flex: 1 1 120px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+  .card .v { font-size: 20px; font-weight: 800; }
+  .card .l { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #0f172a; color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .c { text-align: center; } .r { text-align: right; white-space: nowrap; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill-aktif { background:#dcfce7; color:#15803d; }
+  .pill-blokir { background:#fee2e2; color:#b91c1c; }
+  .pill-putus { background:#e2e8f0; color:#475569; }
+  .pill-cuti { background:#fef3c7; color:#b45309; }
+  .foot { margin-top: 14px; font-size: 11px; color: #94a3b8; }
+  @media print {
+    body { padding: 0; }
+    @page { size: A4 landscape; margin: 10mm; }
+    .foot { display: none; }
+  }
+</style></head>
+<body>
+  <div class="head">
+    <h1>Laporan Data Pelanggan — ${escHtml(k.name)}</h1>
+    <p>Sistem Manajemen Kolektor &amp; Pelanggan</p>
+  </div>
+  <div class="meta">
+    <span>Nama Kolektor: <b>${escHtml(k.name)}</b></span>
+    <span>Username: <b>${escHtml(k.username)}</b></span>
+    <span>Tanggal: <b>${escHtml(today)}</b></span>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="v">${pelanggan.length}</div><div class="l">Total Pelanggan</div></div>
+    <div class="card"><div class="v">${a.aktif}</div><div class="l">Aktif</div></div>
+    <div class="card"><div class="v">${a.blokir}</div><div class="l">Blokir</div></div>
+    <div class="card"><div class="v">${a.putus}</div><div class="l">Putus</div></div>
+    <div class="card"><div class="v">${a.cuti}</div><div class="l">Cuti</div></div>
+    <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
+  </div>
+  <table>
+    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
+  </table>
+  <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
+</body></html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 // --- Export PDF per kolektor ---
