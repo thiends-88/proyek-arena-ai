@@ -47,8 +47,16 @@ function toast(msg, type = 'success') {
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3200);
 }
 
+function authedUrl(path) {
+  const token = localStorage.getItem('token');
+  if (!token) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token);
+}
+
 async function api(path, opts = {}) {
   const headers = {};
+  const token = localStorage.getItem('token');
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   if (opts.body && !(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const res = await fetch(path, { ...opts, headers });
   let data = null;
@@ -56,6 +64,13 @@ async function api(path, opts = {}) {
   if (!res.ok) {
     const err = new Error((data && data.error) || 'Terjadi kesalahan (' + res.status + ')');
     err.status = res.status;
+    if (res.status === 401 && path !== '/api/login' && path !== '/api/me') {
+      // sesi kedaluwarsa → kembali ke login
+      localStorage.removeItem('token');
+      state.user = null;
+      $('#app').classList.add('hidden');
+      $('#login-screen').classList.remove('hidden');
+    }
     throw err;
   }
   return data;
@@ -107,7 +122,8 @@ async function doLogin(e) {
   const errEl = $('#login-error');
   errEl.classList.add('hidden');
   try {
-    const { user } = await api('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    const { user, token } = await api('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    if (token) localStorage.setItem('token', token);
     state.user = user;
     showApp();
     toast('Selamat datang, ' + user.name + '!');
@@ -119,6 +135,7 @@ async function doLogin(e) {
 
 async function doLogout() {
   try { await api('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  localStorage.removeItem('token');
   state.user = null;
   state.pelanggan = [];
   state.kolektor = [];
@@ -258,7 +275,7 @@ async function renderDashboard() {
         <div style="display:flex;flex-wrap:wrap;gap:10px">
           <button class="btn btn-primary" onclick="openImportModal()">⬆️ Import Data Pelanggan (CSV/XLSX)</button>
           <button class="btn btn-accent" onclick="openExportModal()">📄 Export PDF Laporan</button>
-          <a class="btn btn-outline" href="/api/template.csv" download>📥 Unduh Template Import</a>
+          <a class="btn btn-outline" href="${authedUrl('/api/template.csv')}" download>📥 Unduh Template Import</a>
         </div>
       </div></div>` : ''}
       <div class="col-4"><div class="card card-pad">
@@ -347,7 +364,7 @@ async function renderKolektor() {
       </tr>`).join('') : `<tr><td colspan="6" class="empty">Belum ada kolektor. Klik "Tambah Kolektor".</td></tr>`}
       </tbody></table></div>
     </div>
-    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <a href="/api/template.csv" download>unduh template</a>.</div>`;
+    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <a href="${authedUrl('/api/template.csv')}" download>unduh template</a>.</div>`;
 }
 
 async function openKolektorModal(id) {
@@ -392,7 +409,7 @@ async function deleteKolektor(id) {
 async function exportPDF(id) {
   try {
     const a = document.createElement('a');
-    a.href = '/api/export/' + id + '/pdf';
+    a.href = authedUrl('/api/export/' + id + '/pdf');
     a.download = 'laporan.pdf';
     document.body.appendChild(a);
     a.click();
@@ -417,7 +434,7 @@ async function openImportModal(preselectId) {
         <input class="input" type="file" id="imp-file" accept=".csv,.xlsx,.xls" /></div>
       <div class="hint" style="margin-bottom:12px">
         Kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code>.
-        ID boleh dikosongkan (otomatis). <a href="/api/template.csv" download>Unduh template CSV</a>.
+        ID boleh dikosongkan (otomatis). <a href="${authedUrl('/api/template.csv')}" download>Unduh template CSV</a>.
       </div>
       <div id="imp-result"></div>
     </div>
@@ -668,6 +685,7 @@ async function init() {
     state.user = user;
     showApp();
   } catch (e) {
+    localStorage.removeItem('token');
     $('#login-screen').classList.remove('hidden');
   }
 }

@@ -250,9 +250,29 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Auth helpers ---
+// Token-based auth (lebih andal di dalam iframe/preview yang memblokir cookie pihak ketiga).
+const tokenStore = new Map(); // token -> userId
+
+function extractToken(req) {
+  let token = null;
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) token = auth.slice(7).trim();
+  if (!token && req.query && req.query.token) token = String(req.query.token);
+  if (!token && req.body && req.body.token) token = String(req.body.token);
+  return token;
+}
+
 function currentUser(req) {
-  if (!req.session || !req.session.userId) return null;
-  return db.users.find((u) => u.id === req.session.userId) || null;
+  const token = extractToken(req);
+  if (token && tokenStore.has(token)) {
+    const u = db.users.find((x) => x.id === tokenStore.get(token));
+    if (u) return u;
+  }
+  // fallback: session cookie (lingkungan non-iframe)
+  if (req.session && req.session.userId) {
+    return db.users.find((u) => u.id === req.session.userId) || null;
+  }
+  return null;
 }
 function requireAuth(req, res, next) {
   const u = currentUser(req);
@@ -272,11 +292,15 @@ app.post('/api/login', (req, res) => {
   if (!u || !verifyPassword(password, u.password)) {
     return res.status(401).json({ error: 'Username atau password salah.' });
   }
-  req.session.userId = u.id;
-  res.json({ user: publicUser(u) });
+  req.session.userId = u.id; // tetap set session sebagai fallback
+  const token = crypto.randomBytes(24).toString('hex');
+  tokenStore.set(token, u.id);
+  res.json({ user: publicUser(u), token });
 });
 
 app.post('/api/logout', (req, res) => {
+  const token = extractToken(req);
+  if (token) tokenStore.delete(token);
   req.session.destroy(() => res.json({ ok: true }));
 });
 
