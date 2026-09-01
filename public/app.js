@@ -816,13 +816,34 @@ async function deletePelanggan(id) {
 }
 
 /* ---------- Kirim Pesan (WhatsApp) ---------- */
+// Nama bulan dalam Bahasa Indonesia — dipakai template tagihan agar bulan menyesuaikan otomatis.
+const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+// Template pengumuman tagihan bulanan: bulan pemakaian = bulan lalu, masa bayar = bulan ini (1 s/d 10).
+function tagihanBulananTemplate() {
+  const now = new Date();
+  const tahun = now.getFullYear();
+  const bulanIni = BULAN_ID[now.getMonth()];
+  const bulanLalu = BULAN_ID[(now.getMonth() + 11) % 12];
+  return [
+    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal 10 ${bulanIni.toUpperCase()} ${tahun}`,
+    '',
+    'Pembayaran ke kantor buka setiap hari senin-sabtu pada jam kerja (08:00-17:00).',
+    'BAYAR KE KANTOR AKAN DIKENAKAN BIAYA ADMIN 5000',
+    '',
+    'Pembayaran melalui transfer harap mengirimkan bukti transfer ke WA ini agar transfer tersebut dapat diverifikasi sebagai pembayaran sah kecuali pembayaran melalui BRIVA, VA Mandiri Nagari VA, dan BNI VA',
+    '',
+    'Terimakasih',
+  ].join('\n');
+}
+
 function openMessageModal(id) {
   const p = state.pelanggan.find((x) => x.id === id);
   if (!p) return;
   const templates = [
-    `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait tagihan internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.`,
-    `Halo Bpk/Ibu ${p.nama}, ini dari tim kolektor. Apakah ada kendala pada layanan internet Anda? Silakan balas pesan ini. Terima kasih.`,
-    `Selamat siang Bpk/Ibu ${p.nama}, kami informasikan bahwa pembayaran tagihan dapat dilakukan via transfer atau di kantor. Terima kasih.`,
+    { label: 'Konfirmasi Tagihan', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait tagihan internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
+    { label: 'Cek Kendala Layanan', text: `Halo Bpk/Ibu ${p.nama}, ini dari tim kolektor. Apakah ada kendala pada layanan internet Anda? Silakan balas pesan ini. Terima kasih.` },
+    { label: 'Pengumuman Tagihan Bulanan', text: tagihanBulananTemplate() },
   ];
   openModal(`
     <div class="modal-head"><h3>💬 Kirim Pesan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
@@ -834,17 +855,18 @@ function openMessageModal(id) {
         <li><span class="dim">Kelompok</span>${kelompokBadge(p.kelompok)}</li>
       </div>
       <div class="field"><label>Pesan</label>
-        <textarea class="input" id="msg-teks" rows="5" placeholder="Tulis pesan untuk pelanggan…">${esc(templates[0])}</textarea></div>
+        <textarea class="input" id="msg-teks" rows="8" placeholder="Tulis pesan untuk pelanggan…">${esc(templates[0].text)}</textarea></div>
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px" id="msg-templates">
-        ${templates.map((t, i) => `<button type="button" class="btn btn-ghost btn-sm" data-idx="${i}">Template ${i + 1}</button>`).join('')}
+        ${templates.map((t, i) => `<button type="button" class="btn btn-ghost btn-sm" data-idx="${i}">${esc(t.label)}</button>`).join('')}
       </div>
+      <div class="hint" style="margin-top:8px">ℹ️ Template "Pengumuman Tagihan Bulanan" otomatis menyesuaikan bulan pemakaian &amp; masa bayar sesuai tanggal saat ini.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-accent" id="msg-send">💬 Kirim via WhatsApp</button>
     </div>`);
   document.querySelectorAll('#msg-templates button').forEach((b) => {
-    b.addEventListener('click', () => { $('#msg-teks').value = templates[Number(b.dataset.idx)]; });
+    b.addEventListener('click', () => { $('#msg-teks').value = templates[Number(b.dataset.idx)].text; });
   });
   $('#msg-send').addEventListener('click', async () => {
     const teks = $('#msg-teks').value.trim();
