@@ -137,6 +137,46 @@ Tekan `Ctrl+C` untuk berhenti dulu (nanti dijalankan sebagai service).
 
 ---
 
+## D2. Migrasi Data / Database (PENTING)
+
+> 💡 **Konsep database aplikasi ini:** semua data tersimpan dalam **satu file JSON**
+> di `data/db.json`. Folder `data/` **tidak ada di GitHub** (sengaja di-ignore). Saat
+> pertama kali dijalankan, aplikasi **membuat `data/db.json` otomatis** berisi data contoh
+> (demo). Untuk memindahkan data asli Anda, gunakan salah satu cara berikut.
+
+### Cara A — Migrasi lewat file (paling akurat)
+
+1. **Di aplikasi lama** (tempat data Anda berada sekarang):
+   - Login admin → menu **💾 Backup & Restore** → **Buat Backup** → **📋 Salin Semua**.
+   - Simpan teksnya ke file `db.json` di komputer Anda.
+
+2. **Kirim ke server Proxmox** (dari komputer Anda):
+   ```bash
+   scp db.json user@<IP-SERVER>:/tmp/db.json
+   ```
+
+3. **Di server**, hentikan aplikasi lalu timpa:
+   ```bash
+   sudo systemctl stop kolektorapp
+   sudo mkdir -p /opt/kolektorapp/data
+   sudo cp /tmp/db.json /opt/kolektorapp/data/db.json
+   sudo chown $USER:$USER /opt/kolektorapp/data/db.json
+   sudo systemctl start kolektorapp
+   ```
+
+### Cara B — Migrasi lewat UI aplikasi
+
+1. Di server, aplikasi sudah berjalan → login admin.
+2. Menu **💾 Backup & Restore** → **Restore Data** → pilih file `backup-*.json` → **Restore Sekarang**.
+3. Selesai. (Setelah restore, Anda mungkin perlu login ulang.)
+
+### Cara C — Tanpa data lama (mulai kosong / data contoh)
+
+- Cukup jalankan aplikasi; `data/db.json` dibuat otomatis berisi **data contoh**.
+- Untuk data asli Anda, gunakan menu **Data Pelanggan → Import** dengan file CSV/XLSX Anda.
+
+---
+
 ## E. Jalankan sebagai Service (auto-start saat server menyala)
 
 Buat file service systemd:
