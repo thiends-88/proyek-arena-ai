@@ -219,6 +219,9 @@ async function renderDashboard() {
   try { d = await api('/api/dashboard'); } catch (e) { c.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message)}</div>`; return; }
 
   const isAdmin = state.user.role === 'admin';
+  if (isAdmin && !state.kolektor.length) {
+    try { state.kolektor = (await api('/api/kolektor')).kolektor; } catch (e) { /* ignore */ }
+  }
   const kpis = isAdmin
     ? [
         { ico: '👥', label: 'Total Pelanggan', value: d.totalPelanggan, tone: 'tone-blue', foot: 'semua kolektor' },
@@ -249,6 +252,15 @@ async function renderDashboard() {
     </div>
 
     <div class="grid dash-grid" style="margin-top:18px">
+      ${isAdmin ? `
+      <div class="col-12"><div class="card card-pad">
+        <div class="card-head"><div><div class="card-title">⚡ Aksi Cepat — Import &amp; Export Data Pelanggan</div><div class="card-sub">Kelola data pelanggan banyak sekaligus atau cetak laporan PDF</div></div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button class="btn btn-primary" onclick="openImportModal()">⬆️ Import Data Pelanggan (CSV/XLSX)</button>
+          <button class="btn btn-accent" onclick="openExportModal()">📄 Export PDF Laporan</button>
+          <a class="btn btn-outline" href="/api/template.csv" download>📥 Unduh Template Import</a>
+        </div>
+      </div></div>` : ''}
       <div class="col-4"><div class="card card-pad">
         <div class="card-head"><div><div class="card-title">Status Pelanggan</div><div class="card-sub">Distribusi aktif / blokir / putus / cuti</div></div></div>
         <div class="chart-box"><canvas id="ch-status"></canvas></div>
@@ -278,14 +290,19 @@ async function renderDashboard() {
         <div class="chart-box" style="height:300px"><canvas id="ch-perkolektor"></canvas></div>
       </div></div>
       <div class="col-12"><div class="card card-pad">
-        <div class="card-head"><div><div class="card-title">Rekap per Kolektor</div></div></div>
+        <div class="card-head"><div><div class="card-title">Rekap per Kolektor</div><div class="card-sub">Import &amp; export per kolektor</div></div></div>
         <div class="table-wrap"><table class="data"><thead><tr>
-          <th>Kolektor</th><th>Username</th><th class="num">Pelanggan</th><th class="num">Aktif</th><th class="num">Blokir</th><th class="num">Putus</th><th class="num">Cuti</th><th class="num">Total Tagihan</th>
+          <th>Kolektor</th><th>Username</th><th class="num">Pelanggan</th><th class="num">Aktif</th><th class="num">Blokir</th><th class="num">Putus</th><th class="num">Cuti</th><th class="num">Total Tagihan</th><th style="width:230px">Aksi</th>
         </tr></thead><tbody>
         ${d.perKolektor.map((k) => `<tr>
           <td><strong>${esc(k.nama)}</strong></td><td>${esc(k.username)}</td>
           <td class="num">${k.totalPelanggan}</td><td class="num">${k.aktif}</td><td class="num">${k.blokir}</td><td class="num">${k.putus}</td><td class="num">${k.cuti}</td>
           <td class="num"><strong>${fmtRp(k.totalTagihan)}</strong></td>
+          <td><div class="row-actions">
+            <button class="btn btn-ghost btn-sm" onclick="openImportModal('${k.kolektorId}')">⬆️ Import</button>
+            <button class="btn btn-accent btn-sm" onclick="exportPDF('${k.kolektorId}')">📄 Export PDF</button>
+            <button class="btn btn-outline btn-sm" onclick="go('pelanggan', {kolektorId:'${k.kolektorId}'})">📋 Data</button>
+          </div></td>
         </tr>`).join('')}
         </tbody></table></div>
       </div></div>` : ''}
@@ -385,7 +402,10 @@ async function exportPDF(id) {
 }
 
 /* ---------- Import ---------- */
-function openImportModal(preselectId) {
+async function openImportModal(preselectId) {
+  if (!state.kolektor.length) {
+    try { state.kolektor = (await api('/api/kolektor')).kolektor; } catch (e) { toast(e.message, 'error'); return; }
+  }
   const opts = state.kolektor.map((k) => `<option value="${k.id}" ${k.id === preselectId ? 'selected' : ''}>${esc(k.name)} (${esc(k.username)})</option>`).join('');
   openModal(`
     <div class="modal-head"><h3>Import Data Pelanggan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
@@ -426,6 +446,28 @@ function openImportModal(preselectId) {
       errEl.textContent = e.message; errEl.classList.remove('hidden');
       btn.disabled = false; btn.textContent = '⬆️ Import Sekarang';
     }
+  });
+}
+
+async function openExportModal() {
+  if (!state.kolektor.length) {
+    try { state.kolektor = (await api('/api/kolektor')).kolektor; } catch (e) { toast(e.message, 'error'); return; }
+  }
+  const opts = state.kolektor.map((k) => `<option value="${k.id}">${esc(k.name)} (${esc(k.username)})</option>`).join('');
+  openModal(`
+    <div class="modal-head"><h3>📄 Export PDF Laporan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Pilih Kolektor</label>
+        <select class="input" id="exp-kolektor">${opts}</select></div>
+      <div class="hint" style="margin-top:12px">Laporan berisi ringkasan statistik + tabel lengkap data pelanggan kolektor terpilih.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-accent" id="exp-run">📄 Download PDF</button>
+    </div>`);
+  $('#exp-run').addEventListener('click', () => {
+    exportPDF($('#exp-kolektor').value);
+    closeModal();
   });
 }
 
