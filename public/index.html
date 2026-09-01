@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kolektor App — Manajemen Data Pelanggan</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- ============ LOGIN ============ -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="logo">📡</div>
+        <h1>Kolektor<span>App</span></h1>
+        <p>Manajemen Data Pelanggan &amp; Kolektor</p>
+      </div>
+      <form id="login-form" autocomplete="off">
+        <label>Username</label>
+        <input type="text" id="login-username" placeholder="mis. admin" required />
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required />
+        <div id="login-error" class="form-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block">Masuk</button>
+      </form>
+      <div class="login-hint">
+        <strong>Akun demo:</strong><br />
+        Admin — <code>admin</code> / <code>admin123</code><br />
+        Kolektor — <code>andi</code>, <code>budi</code>, <code>citra</code> / <code>kolektor123</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="app" class="hidden">
+    <aside id="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo">📡</div>
+        <div>
+          <div class="brand-name">Kolektor<span>App</span></div>
+          <div class="brand-sub">Data Pelanggan</div>
+        </div>
+      </div>
+      <nav id="nav"></nav>
+      <div class="sidebar-user">
+        <div class="avatar" id="user-avatar"></div>
+        <div class="user-meta">
+          <div id="user-name"></div>
+          <div id="user-role"></div>
+        </div>
+        <button id="btn-logout" class="icon-btn" title="Keluar">⎋</button>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header id="topbar">
+        <h2 id="page-title">Dashboard</h2>
+        <div class="topbar-right" id="topbar-right"></div>
+      </header>
+      <div id="content" class="content"></div>
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
