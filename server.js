@@ -641,7 +641,9 @@ app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, re
     const buffer = await generateKolektorPDF(k, pelanggan);
     const fname = 'laporan-' + k.username + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + fname + '"');
+    // view=1 → tampilkan inline (untuk dibuka di tab baru), default → unduh
+    const disp = req.query.view === '1' ? 'inline' : 'attachment';
+    res.setHeader('Content-Disposition', disp + '; filename="' + fname + '"');
     res.send(buffer);
   } catch (e) {
     console.error(e);

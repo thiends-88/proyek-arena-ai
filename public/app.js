@@ -108,35 +108,90 @@ async function api(path, opts = {}) {
   return data;
 }
 
-// Unduh file (PDF/CSV) secara andal: ambil via fetch (dengan auth token),
-// lalu simpan lewat blob + objectURL. Metode <a download> biasa sering diblokir
-// di lingkungan preview/iframe, jadi pakai cara ini.
-async function downloadFile(url, filename) {
+// Ambil file sebagai blob (dengan auth token).
+async function fetchBlob(url) {
   const headers = {};
   const token = getToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
   const res = await fetch(authedUrl(url), { headers });
   if (!res.ok) {
-    let msg = 'Gagal mengunduh file (' + res.status + ')';
+    let msg = 'Gagal memuat file (' + res.status + ')';
     try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) { /* bukan JSON */ }
     throw new Error(msg);
   }
-  const blob = await res.blob();
+  return res.blob();
+}
+
+// Simpan blob sebagai file (best-effort — bisa diblokir di iframe/preview).
+function saveBlob(blob, filename) {
   const objUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objUrl;
   a.download = filename || 'file';
+  a.rel = 'noopener';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { a.remove(); try { URL.revokeObjectURL(objUrl); } catch (e) {} }, 4000);
 }
 
-async function downloadTemplate() {
+// Salin teks ke clipboard dengan fallback untuk lingkungan yang membatasi clipboard API.
+async function copyText(text) {
   try {
-    await downloadFile('/api/template.csv', 'template-import-pelanggan.csv');
-    toast('Template import berhasil diunduh.');
-  } catch (e) { toast(e.message, 'error'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { /* lanjut ke fallback */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (e) { return false; }
+}
+
+// Isi template import (di-generate di sisi klien agar selalu bisa diakses, bahkan tanpa unduhan).
+function templateCSV() {
+  const header = ['ID', 'Nama Pelanggan', 'No HP / WA', 'Status', 'Infrastruktur', 'Tagihan', 'Kelompok', 'Jumlah Tagihan'];
+  const rows = [
+    ['P-001', 'Rudi Hartono', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000'],
+    ['P-002', 'Siti Aminah', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0'],
+  ];
+  const lines = [header.join(','), ...rows.map((r) => r.join(','))];
+  return '\uFEFF' + lines.join('\n');
+}
+
+function downloadTemplate() {
+  const csv = templateCSV();
+  openModal(`
+    <div class="modal-head"><h3>📥 Template Import</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="hint" style="margin-bottom:10px">
+        Salin teks di bawah lalu tempel ke Excel/Notepad (simpan sebagai <code>.csv</code>), atau unduh langsung sebagai file CSV.
+      </div>
+      <textarea class="input" id="tpl-csv" rows="7" readonly style="font-family:monospace;font-size:12px;white-space:pre">${esc(csv)}</textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" id="tpl-copy">📋 Salin Semua</button>
+      <button class="btn btn-primary" id="tpl-download">⬇️ Unduh CSV</button>
+    </div>`);
+  $('#tpl-copy').addEventListener('click', async () => {
+    const ok = await copyText(csv);
+    toast(ok ? 'Teks template disalin ke clipboard.' : 'Gagal menyalin — blok teks lalu salin manual.', ok ? 'success' : 'error');
+  });
+  $('#tpl-download').addEventListener('click', () => {
+    try {
+      saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'template-import-pelanggan.csv');
+      toast('Template CSV diunduh. Jika tidak muncul, gunakan tombol "Salin Semua".');
+    } catch (e) { toast(e.message, 'error'); }
+  });
 }
 
 /* ---------- Badges ---------- */
@@ -470,13 +525,35 @@ async function deleteKolektor(id) {
 }
 
 async function exportPDF(id) {
+  const k = state.kolektor.find((x) => x.id === id);
+  const uname = k ? k.username : id;
+  const fname = 'laporan-' + uname + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+
+  let blob;
   try {
-    const k = state.kolektor.find((x) => x.id === id);
-    const uname = k ? k.username : id;
-    const fname = 'laporan-' + uname + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
-    await downloadFile('/api/export/' + id + '/pdf', fname);
-    toast('Laporan PDF berhasil diunduh.');
-  } catch (e) { toast(e.message, 'error'); }
+    blob = await fetchBlob('/api/export/' + id + '/pdf');
+  } catch (e) { toast(e.message, 'error'); return; }
+
+  // coba unduh otomatis (best-effort)
+  try { saveBlob(blob, fname); } catch (e) { /* abaikan, ada opsi lain di modal */ }
+
+  // objectURL untuk pratinjau & buka di tab baru
+  const objUrl = URL.createObjectURL(blob);
+  const openUrl = authedUrl('/api/export/' + id + '/pdf?view=1');
+  openModal(`
+    <div class="modal-head"><h3>📄 Laporan PDF Siap</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="hint" style="margin-bottom:12px">${esc(fname)} — jika file tidak terunduh otomatis, gunakan salah satu opsi di bawah:</div>
+      <iframe id="pdf-preview" src="${objUrl}" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:10px;background:#f8fafc"></iframe>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="window.open('${openUrl}', '_blank')">🔗 Buka di Tab Baru</button>
+      <button class="btn btn-primary" id="pdf-retry">⬇️ Unduh File</button>
+    </div>`);
+  $('#pdf-retry').addEventListener('click', () => {
+    saveBlob(blob, fname);
+    toast('Mengunduh ' + fname + '…');
+  });
 }
 
 /* ---------- Import ---------- */
