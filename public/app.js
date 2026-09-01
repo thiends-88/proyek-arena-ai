@@ -263,6 +263,38 @@ async function doLogout() {
   $('#login-password').value = '';
 }
 
+function openUbahPasswordModal() {
+  openModal(`
+    <div class="modal-head"><h3>🔑 Ubah Password</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div id="pw-error" class="form-error hidden"></div>
+      <div class="form-grid">
+        <div class="field full"><label>Password Lama <span class="req">*</span></label><input class="input" type="password" id="pw-lama" placeholder="Password saat ini" /></div>
+        <div class="field full"><label>Password Baru <span class="req">*</span></label><input class="input" type="password" id="pw-baru" placeholder="min. 4 karakter" /></div>
+        <div class="field full"><label>Ulangi Password Baru <span class="req">*</span></label><input class="input" type="password" id="pw-baru2" placeholder="Ketik ulang password baru" /></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" id="pw-save">Simpan</button>
+    </div>`);
+  $('#pw-save').addEventListener('click', async () => {
+    const errEl = $('#pw-error');
+    errEl.classList.add('hidden');
+    const lama = $('#pw-lama').value;
+    const baru = $('#pw-baru').value;
+    const baru2 = $('#pw-baru2').value;
+    if (!lama) { errEl.textContent = 'Password lama wajib diisi.'; errEl.classList.remove('hidden'); return; }
+    if (!baru || baru.length < 4) { errEl.textContent = 'Password baru minimal 4 karakter.'; errEl.classList.remove('hidden'); return; }
+    if (baru !== baru2) { errEl.textContent = 'Konfirmasi password baru tidak sama.'; errEl.classList.remove('hidden'); return; }
+    try {
+      await api('/api/ubah-password', { method: 'POST', body: JSON.stringify({ passwordLama: lama, passwordBaru: baru }) });
+      closeModal();
+      toast('Password berhasil diubah.');
+    } catch (e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+  });
+}
+
 function showApp() {
   $('#login-screen').classList.add('hidden');
   $('#app').classList.remove('hidden');
@@ -832,6 +864,7 @@ function openMessageModal(id) {
 async function init() {
   $('#login-form').addEventListener('submit', doLogin);
   $('#btn-logout').addEventListener('click', doLogout);
+  $('#btn-password').addEventListener('click', openUbahPasswordModal);
   try {
     const { user } = await api('/api/me');
     state.user = user;

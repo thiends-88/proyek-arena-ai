@@ -231,11 +231,20 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## G. Keamanan & Akun (WAJIB sebelum dipakai)
 
-1. **Ganti password default** — login sebagai admin, buka menu **Kolektor**, dan perbarui
-   password tiap kolektor. Password admin diubah dengan menambahkan fitur ini (lihat catatan
-   di README) atau edit langsung file `data/db.json` lalu restart service.
-2. Batasi akses hanya ke jaringan lokal (jangan buka port ke internet tanpa HTTPS).
-3. Untuk akses dari luar kantor, gunakan **VPN** (WireGuard/Tailscale) daripada mengekspos port.
+**1. Ganti password admin** (akun `admin` / `admin123`):
+
+- Login sebagai admin → klik ikon **🔑** di pojok kiri bawah (samping tombol keluar).
+- Isi **password lama** (`admin123`) → **password baru** → **ulangi password baru** → **Simpan**.
+
+**2. Ganti password tiap kolektor** (default `kolektor123`):
+
+- Login sebagai admin → menu **Kolektor** → klik ikon **✏️** pada baris kolektor.
+- Isi **Password** baru (biarkan nama tetap) → **Simpan**.
+
+**3. Amankan jaringan:**
+
+- Batasi akses hanya ke jaringan lokal (jangan buka port ke internet tanpa HTTPS).
+- Untuk akses dari luar kantor, gunakan **VPN** (WireGuard/Tailscale) daripada mengekspos port.
 
 ---
 

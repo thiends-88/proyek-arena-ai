@@ -330,6 +330,17 @@ app.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
+// Ubah password sendiri (berlaku untuk admin & kolektor)
+app.post('/api/ubah-password', requireAuth, (req, res) => {
+  const { passwordLama, passwordBaru } = req.body || {};
+  if (!passwordLama) return res.status(400).json({ error: 'Password lama wajib diisi.' });
+  if (!passwordBaru || String(passwordBaru).length < 4) return res.status(400).json({ error: 'Password baru minimal 4 karakter.' });
+  if (!verifyPassword(passwordLama, req.user.password)) return res.status(400).json({ error: 'Password lama salah.' });
+  req.user.password = hashPassword(passwordBaru);
+  saveDB(db);
+  res.json({ ok: true });
+});
+
 app.get('/api/me', (req, res) => {
   const u = currentUser(req);
   if (!u) return res.status(401).json({ error: 'Belum login.' });
