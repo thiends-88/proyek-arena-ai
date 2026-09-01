@@ -104,4 +104,7 @@ P-002,Siti Aminah,081298765432,blokir,fiber optic,no,blokir dulu baru bayar,0
 | POST | `/api/import` | Import file CSV/XLSX (admin) |
 | GET | `/api/dashboard` | Data analisa dashboard |
 | GET | `/api/export/:kolektorId/pdf` | Export PDF per kolektor (admin) |
+| GET | `/api/export/:kolektorId/html` | Laporan HTML siap cetak (admin) |
 | GET | `/api/template.csv` | Unduh template import |
+| GET | `/api/backup` | Ambil backup data (admin) |
+| POST | `/api/restore` | Pulihkan data dari file backup (admin) |

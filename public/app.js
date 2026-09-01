@@ -302,12 +302,86 @@ function showApp() {
   go('dashboard');
 }
 
+/* ---------- Backup & Restore (admin) ---------- */
+async function renderBackup() {
+  const c = $('#content');
+  c.innerHTML = `<div class="empty"><span class="spin">⏳</span> Memuat info data…</div>`;
+  let info;
+  try { info = await api('/api/backup'); } catch (e) { c.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message)}</div>`; return; }
+
+  c.innerHTML = `
+    <div class="grid two-col">
+      <div class="card card-pad">
+        <div class="card-head"><div><div class="card-title">💾 Backup Data</div><div class="card-sub">Simpan seluruh data aplikasi (kolektor, pelanggan, riwayat pesan) ke file JSON</div></div></div>
+        <div class="list-plain" style="margin-bottom:16px">
+          <li><span class="dim">Kolektor</span><strong>${info.ringkasan.kolektor}</strong></li>
+          <li><span class="dim">Pelanggan</span><strong>${info.ringkasan.pelanggan}</strong></li>
+          <li><span class="dim">Riwayat Pesan</span><strong>${info.ringkasan.pesan}</strong></li>
+          <li><span class="dim">Waktu backup</span><strong>${new Date().toLocaleString('id-ID')}</strong></li>
+        </div>
+        <button class="btn btn-primary" onclick="openBackupModal()">💾 Buat Backup</button>
+      </div>
+      <div class="card card-pad">
+        <div class="card-head"><div><div class="card-title">♻️ Restore Data</div><div class="card-sub">Pulihkan data dari file backup (.json)</div></div></div>
+        <div class="hint" style="margin-bottom:12px">⚠️ <strong>Restore akan MENGGANTI seluruh data saat ini</strong> dengan isi file backup. Pastikan Anda sudah punya backup terbaru.</div>
+        <div class="field" style="margin-bottom:12px"><label>File Backup (.json)</label>
+          <input class="input" type="file" id="restore-file" accept=".json,application/json" /></div>
+        <button class="btn btn-accent" onclick="doRestore()">♻️ Restore Sekarang</button>
+        <div id="restore-result" style="margin-top:12px"></div>
+      </div>
+    </div>`;
+}
+
+async function openBackupModal() {
+  let data;
+  try { data = await api('/api/backup'); } catch (e) { toast(e.message, 'error'); return; }
+  openModal(`
+    <div class="modal-head"><h3>💾 Backup Data</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="hint" style="margin-bottom:10px">
+        Salin seluruh teks di bawah lalu simpan ke file bernama <code>${esc(data.namaFile)}</code>.
+        Di server lokal Anda, tombol <strong>⬇️ Unduh File</strong> juga berfungsi normal.
+      </div>
+      <textarea class="input" id="bk-json" rows="14" readonly style="font-family:monospace;font-size:11.5px;white-space:pre">${esc(data.json)}</textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" id="bk-download">⬇️ Unduh File</button>
+      <button class="btn btn-primary" id="bk-copy">📋 Salin Semua</button>
+    </div>`, 'wide');
+  $('#bk-copy').addEventListener('click', async () => {
+    const ok = await copyText(data.json);
+    toast(ok ? 'Backup disalin ke clipboard.' : 'Gagal menyalin — blok teks lalu salin manual.', ok ? 'success' : 'error');
+  });
+  $('#bk-download').addEventListener('click', () => {
+    try {
+      saveBlob(new Blob([data.json], { type: 'application/json' }), data.namaFile);
+      toast('Mengunduh ' + data.namaFile + '…');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+async function doRestore() {
+  const fileInput = document.getElementById('restore-file');
+  const file = fileInput && fileInput.files[0];
+  if (!file) { toast('Pilih file backup terlebih dahulu.', 'error'); return; }
+  const ok = await confirmDialog('Restore Data', 'Yakin mengganti <strong>seluruh data saat ini</strong> dengan isi file backup? Data saat ini akan ditimpa.');
+  if (!ok) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await api('/api/restore', { method: 'POST', body: fd });
+    document.getElementById('restore-result').innerHTML = `<div class="form-error" style="background:#dcfce7;color:#15803d;margin:0">✅ Restore berhasil — ${r.ringkasan.kolektor} kolektor, ${r.ringkasan.pelanggan} pelanggan dimuat.</div>`;
+    toast('Restore berhasil.');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 /* ---------- Navigation ---------- */
 const NAV = {
   admin: [
     { id: 'dashboard', label: 'Dashboard Analisa', ico: '📊' },
     { id: 'kolektor', label: 'Kolektor', ico: '👤' },
     { id: 'pelanggan', label: 'Data Pelanggan', ico: '📋' },
+    { id: 'backup', label: 'Backup & Restore', ico: '💾' },
   ],
   kolektor: [
     { id: 'dashboard', label: 'Dashboard Saya', ico: '📊' },
@@ -332,12 +406,13 @@ function go(view, opts = {}) {
   Object.values(state.charts).forEach((ch) => { try { ch.destroy(); } catch (e) {} });
   state.charts = {};
   renderSidebar();
-  const titles = { dashboard: 'Dashboard Analisa', kolektor: 'Manajemen Kolektor', pelanggan: 'Data Pelanggan' };
+  const titles = { dashboard: 'Dashboard Analisa', kolektor: 'Manajemen Kolektor', pelanggan: 'Data Pelanggan', backup: 'Backup & Restore Data' };
   $('#page-title').textContent = (titles[view] || 'Dashboard');
   renderTopbarActions(view);
   if (view === 'dashboard') renderDashboard();
   else if (view === 'kolektor') renderKolektor();
   else if (view === 'pelanggan') renderPelanggan(opts);
+  else if (view === 'backup') renderBackup();
 }
 
 function renderTopbarActions(view) {

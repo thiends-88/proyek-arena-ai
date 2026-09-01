@@ -251,7 +251,7 @@ app.use(session({
   cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 12 },
 }));
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // Nonaktifkan cache untuk file statis agar browser selalu memuat versi terbaru
 app.use((req, res, next) => {
@@ -518,6 +518,59 @@ function waLink(noHp, teks) {
   else if (digits.startsWith('8')) digits = '62' + digits;
   return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(teks);
 }
+
+// --- Backup & Restore (admin) ---
+function ringkasanDB(d) {
+  return {
+    kolektor: (d.users || []).filter((u) => u.role === 'kolektor').length,
+    pelanggan: (d.pelanggan || []).length,
+    pesan: (d.pesan || []).length,
+  };
+}
+
+app.get('/api/backup', requireAuth, requireAdmin, (req, res) => {
+  const data = JSON.stringify(db, null, 2);
+  if (req.query.download === '1') {
+    const fname = 'backup-kolektorapp-' + new Date().toISOString().slice(0, 10) + '.json';
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + fname + '"');
+    return res.send(data);
+  }
+  res.json({ ok: true, ringkasan: ringkasanDB(db), json: data, namaFile: 'backup-kolektorapp-' + new Date().toISOString().slice(0, 10) + '.json' });
+});
+
+app.post('/api/restore', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan.' });
+  let parsed;
+  try {
+    parsed = JSON.parse(req.file.buffer.toString('utf8'));
+  } catch (e) {
+    return res.status(400).json({ error: 'File bukan JSON yang valid.' });
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.users) || !Array.isArray(parsed.pelanggan)) {
+    return res.status(400).json({ error: 'Struktur file backup tidak dikenali (harus berisi "users" dan "pelanggan").' });
+  }
+
+  // Amankan: buat salinan data saat ini sebelum ditimpa
+  try {
+    const bak = DB_FILE + '.bak-' + Date.now();
+    fs.writeFileSync(bak, JSON.stringify(db, null, 2));
+  } catch (e) { /* tidak fatal */ }
+
+  db = parsed;
+  if (!db.meta || typeof db.meta !== 'object') db.meta = {};
+  if (!Array.isArray(db.pesan)) db.pesan = [];
+  // hitung ulang counter ID otomatis agar tidak bentrok
+  const maxSeq = (db.pelanggan || []).reduce((m, p) => {
+    const mt = /^PLG-(\d+)$/.exec(String(p.id || ''));
+    return mt ? Math.max(m, parseInt(mt[1], 10)) : m;
+  }, 0);
+  db.meta.seqPelanggan = Math.max(db.meta.seqPelanggan || 0, maxSeq, (db.pelanggan || []).length);
+  db.meta.seqKolektor = Math.max(db.meta.seqKolektor || 0, (db.users || []).filter((u) => u.role === 'kolektor').length);
+  saveDB(db);
+
+  res.json({ ok: true, ringkasan: ringkasanDB(db) });
+});
 
 // --- Import file (CSV / XLSX) ---
 app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, res) => {

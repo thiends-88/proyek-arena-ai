@@ -250,7 +250,16 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## H. Backup Data (PENTING — data tersimpan di file JSON)
 
-Semua data ada di `/opt/kolektorapp/data/db.json`. Backup cukup satu file itu:
+**Cara 1 — Dari aplikasi (disarankan):**
+
+Login sebagai admin → menu **💾 Backup & Restore**:
+- **Backup**: klik "Buat Backup" → salin seluruh teks (tombol *Salin Semua*) atau unduh file
+  `backup-kolektorapp-YYYY-MM-DD.json`.
+- **Restore**: pilih file backup (.json) → "Restore Sekarang" (seluruh data saat ini akan diganti).
+
+**Cara 2 — Langsung dari file di server:**
+
+Semua data ada di `/opt/kolektorapp/data/db.json`. Backup cukup dengan menyalin satu file itu:
 
 ```bash
 # Backup manual
