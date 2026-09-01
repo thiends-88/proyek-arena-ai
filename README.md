@@ -43,6 +43,11 @@ npm start
 
 Buka **http://localhost:3000** (server berjalan di port `3000`).
 
+## 🖥️ Deploy ke Server (Proxmox / Linux)
+
+Panduan lengkap (LXC container, VM, systemd service, nginx, backup, keamanan)
+tersedia di **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
 ## 📥 Format File Import (CSV / XLSX)
 
 Kolom header (urutan bebas, tidak case-sensitive):
