@@ -51,15 +51,18 @@ Kolom header (urutan bebas, tidak case-sensitive):
 ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan
 ```
 
-- `ID` boleh dikosongkan → otomatis dibuat.
+- `ID` **wajib diisi & unik** — ID mengikuti data import Anda (tidak dibuat otomatis oleh sistem).
 - Nilai kategori dinormalisasi otomatis (mis. `fiber` → `fiber optic`, `blok` → `blokir`).
 - Contoh baris:
 
 ```csv
 ID,Nama Pelanggan,No HP / WA,Status,Infrastruktur,Tagihan,Kelompok,Jumlah Tagihan
-,Rudi Hartono,081234567890,aktif,wireless,yes,pelanggan lancar,250000
-,Siti Aminah,081298765432,blokir,fiber optic,no,blokir dulu baru bayar,0
+P-001,Rudi Hartono,081234567890,aktif,wireless,yes,pelanggan lancar,250000
+P-002,Siti Aminah,081298765432,blokir,fiber optic,no,blokir dulu baru bayar,0
 ```
+
+> Untuk tambah pelanggan manual, kolom ID bersifat opsional: jika diisi akan dipakai
+> (harus unik), jika dikosongkan sistem membuatkan ID otomatis.
 
 > 💡 Template dapat diunduh langsung dari halaman **Kolektor → Import** atau dari
 > endpoint `/api/template.csv`.

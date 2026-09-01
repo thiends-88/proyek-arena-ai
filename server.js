@@ -420,8 +420,17 @@ app.post('/api/pelanggan', requireAuth, (req, res) => {
     if (!k) return res.status(400).json({ error: 'Kolektor tidak valid.' });
     kolektorId = k.id;
   }
-  db.meta.seqPelanggan += 1;
-  const pelanggan = { id: 'PLG-' + String(db.meta.seqPelanggan).padStart(4, '0'), kolektorId, ...v.data, createdAt: new Date().toISOString() };
+  // ID: gunakan ID dari input bila diisi & unik; jika kosong, buat otomatis.
+  let id = String(req.body.id || '').trim();
+  if (id) {
+    if (db.pelanggan.some((p) => p.id === id)) {
+      return res.status(400).json({ error: 'ID "' + id + '" sudah digunakan. Gunakan ID lain.' });
+    }
+  } else {
+    db.meta.seqPelanggan += 1;
+    id = 'PLG-' + String(db.meta.seqPelanggan).padStart(4, '0');
+  }
+  const pelanggan = { id, kolektorId, ...v.data, createdAt: new Date().toISOString() };
   db.pelanggan.push(pelanggan);
   saveDB(db);
   res.json({ pelanggan });
@@ -523,6 +532,7 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 
   const imported = [];
   const errors = [];
+  const importedIds = new Set();
   rows.forEach((raw, i) => {
     const mapped = {};
     Object.keys(raw).forEach((key) => {
@@ -539,18 +549,24 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
     if (!nama) { errors.push(`Baris ${i + 2}: nama kosong.`); return; }
     if (!noHp) { errors.push(`Baris ${i + 2}: no HP kosong.`); return; }
 
+    // ID mengikuti data import (tidak dibuat otomatis oleh sistem)
+    const id = (mapped.id === null || mapped.id === undefined) ? '' : String(mapped.id).trim();
+    if (!id) {
+      errors.push(`Baris ${i + 2}: ID kosong — baris dilewati (ID harus diisi sesuai data Anda).`);
+      return;
+    }
+    if (db.pelanggan.some((p) => p.id === id) || importedIds.has(id)) {
+      errors.push(`Baris ${i + 2}: ID "${id}" sudah ada / duplikat — baris dilewati.`);
+      return;
+    }
+    importedIds.add(id);
+
     const status = normStatus(mapped.status) || 'aktif';
     const infrastruktur = normInfra(mapped.infrastruktur) || 'wireless';
     const tagihan = normTagihan(mapped.tagihan) || 'no';
     const kelompok = normKelompok(mapped.kelompok) || 'pelanggan lancar';
-    let jumlahTagihan = parseNumber(mapped.jumlahTagihan);
+    const jumlahTagihan = parseNumber(mapped.jumlahTagihan);
 
-    let id = mapped.id ? String(mapped.id).trim() : null;
-    if (id && db.pelanggan.some((p) => p.id === id)) { errors.push(`Baris ${i + 2}: ID ${id} sudah ada, ID diganti otomatis.`); id = null; }
-    if (!id) {
-      db.meta.seqPelanggan += 1;
-      id = 'PLG-' + String(db.meta.seqPelanggan).padStart(4, '0');
-    }
     db.pelanggan.push({ id, kolektorId: k.id, nama, noHp, status, infrastruktur, tagihan, kelompok, jumlahTagihan, createdAt: new Date().toISOString() });
     imported.push({ id, nama, noHp });
   });
@@ -563,8 +579,8 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 app.get('/api/template.csv', requireAuth, requireAdmin, (req, res) => {
   const header = ['ID', 'Nama Pelanggan', 'No HP / WA', 'Status', 'Infrastruktur', 'Tagihan', 'Kelompok', 'Jumlah Tagihan'];
   const contoh = [
-    ['', 'Rudi Hartono', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000'],
-    ['', 'Siti Aminah', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0'],
+    ['P-001', 'Rudi Hartono', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000'],
+    ['P-002', 'Siti Aminah', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0'],
   ];
   const lines = [header.join(','), ...contoh.map((r) => r.join(','))];
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

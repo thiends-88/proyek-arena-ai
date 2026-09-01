@@ -31,6 +31,17 @@ const state = {
 /* ---------- Util ---------- */
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Aman untuk dipakai di dalam string literal JS pada atribut onclick (ID dari data import bisa berisi karakter khusus)
+const jsAttr = (s) => String(s == null ? '' : s)
+  .replace(/\\/g, '\\\\')
+  .replace(/'/g, '\\u0027')
+  .replace(/"/g, '\\u0022')
+  .replace(/\n/g, '\\n')
+  .replace(/\r/g, '\\r')
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e')
+  .replace(/&/g, '\\u0026');
+const enc = (s) => encodeURIComponent(String(s == null ? '' : s));
 const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 const fmtRpShort = (n) => {
   n = Number(n || 0);
@@ -385,7 +396,7 @@ async function renderKolektor() {
       </tr>`).join('') : `<tr><td colspan="6" class="empty">Belum ada kolektor. Klik "Tambah Kolektor".</td></tr>`}
       </tbody></table></div>
     </div>
-    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <a href="${authedUrl('/api/template.csv')}" download>unduh template</a>.</div>`;
+    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <strong>ID mengikuti data import Anda</strong> (wajib diisi &amp; unik). <a href="${authedUrl('/api/template.csv')}" download>Unduh template</a>.</div>`;
 }
 
 async function openKolektorModal(id) {
@@ -455,7 +466,7 @@ async function openImportModal(preselectId) {
         <input class="input" type="file" id="imp-file" accept=".csv,.xlsx,.xls" /></div>
       <div class="hint" style="margin-bottom:12px">
         Kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code>.
-        ID boleh dikosongkan (otomatis). <a href="${authedUrl('/api/template.csv')}" download>Unduh template CSV</a>.
+        <strong>ID mengikuti data Anda</strong> (wajib diisi &amp; unik). <a href="${authedUrl('/api/template.csv')}" download>Unduh template CSV</a>.
       </div>
       <div id="imp-result"></div>
     </div>
@@ -570,9 +581,9 @@ function renderPelangganTable() {
       <td class="num"><strong>${fmtRp(p.jumlahTagihan)}</strong></td>
       ${isAdmin ? `<td>${esc(p.kolektorNama || '-')}</td>` : ''}
       <td><div class="row-actions">
-        <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${p.id}')">✏️</button>
-        <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${p.id}')">💬</button>
-        <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${p.id}')">🗑️</button>
+        <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${jsAttr(p.id)}')">✏️</button>
+        <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${jsAttr(p.id)}')">💬</button>
+        <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${jsAttr(p.id)}')">🗑️</button>
       </div></td>
     </tr>`).join('') : `<tr><td colspan="${isAdmin ? 10 : 9}" class="empty"><div class="big">📭</div>Belum ada data pelanggan.</td></tr>`}
     </tbody></table></div></div>
@@ -604,12 +615,16 @@ function openPelangganModal(id) {
       <select class="input" id="pl-kolektor">
         ${state.kolektor.map((k) => `<option value="${k.id}" ${p && p.kolektorId === k.id ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}
       </select></div>` : '';
+  const idField = p
+    ? `<div class="field full"><label>ID</label><input class="input" value="${esc(p.id)}" disabled /></div>`
+    : `<div class="field full"><label>ID <span class="hint" style="font-weight:400">(opsional — kosongkan untuk otomatis)</span></label><input class="input" id="pl-id" placeholder="mis. P-001" /></div>`;
 
   openModal(`
     <div class="modal-head"><h3>${title}</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
       <div id="pl-error" class="form-error hidden"></div>
       <div class="form-grid">
+        ${idField}
         <div class="field full"><label>Nama Pelanggan <span class="req">*</span></label><input class="input" id="pl-nama" value="${esc(p ? p.nama : '')}" placeholder="Nama lengkap" /></div>
         <div class="field full"><label>No HP / WA <span class="req">*</span></label><input class="input" id="pl-nohp" value="${esc(p ? p.noHp : '')}" placeholder="mis. 081234567890" /></div>
         ${kolektorSelect}
@@ -637,8 +652,9 @@ function openPelangganModal(id) {
       jumlahTagihan: $('#pl-jumlah').value,
     };
     if (isAdmin) payload.kolektorId = $('#pl-kolektor').value;
+    if (!p) payload.id = $('#pl-id').value;
     try {
-      if (p) await api('/api/pelanggan/' + p.id, { method: 'PUT', body: JSON.stringify(payload) });
+      if (p) await api('/api/pelanggan/' + enc(p.id), { method: 'PUT', body: JSON.stringify(payload) });
       else await api('/api/pelanggan', { method: 'POST', body: JSON.stringify(payload) });
       closeModal(); toast(p ? 'Data pelanggan diperbarui.' : 'Pelanggan ditambahkan.');
       renderPelanggan();
@@ -649,7 +665,7 @@ function openPelangganModal(id) {
 async function deletePelanggan(id) {
   const ok = await confirmDialog('Hapus Pelanggan', 'Yakin hapus data pelanggan ini? Tindakan tidak bisa dibatalkan.');
   if (!ok) return;
-  try { await api('/api/pelanggan/' + id, { method: 'DELETE' }); toast('Pelanggan dihapus.'); renderPelanggan(); } catch (e) { toast(e.message, 'error'); }
+  try { await api('/api/pelanggan/' + enc(id), { method: 'DELETE' }); toast('Pelanggan dihapus.'); renderPelanggan(); } catch (e) { toast(e.message, 'error'); }
 }
 
 /* ---------- Kirim Pesan (WhatsApp) ---------- */
@@ -689,7 +705,7 @@ function openMessageModal(id) {
     errEl.classList.add('hidden');
     if (!teks) { errEl.textContent = 'Pesan tidak boleh kosong.'; errEl.classList.remove('hidden'); return; }
     try {
-      const r = await api('/api/pelanggan/' + p.id + '/message', { method: 'POST', body: JSON.stringify({ teks }) });
+      const r = await api('/api/pelanggan/' + enc(p.id) + '/message', { method: 'POST', body: JSON.stringify({ teks }) });
       closeModal();
       toast('Pesan tercatat. Membuka WhatsApp…');
       window.open(r.wa, '_blank');
