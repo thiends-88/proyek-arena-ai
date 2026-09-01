@@ -8,6 +8,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "chart.js": "^4.4.3",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "multer": "^2.0.1",
