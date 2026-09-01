@@ -108,6 +108,37 @@ async function api(path, opts = {}) {
   return data;
 }
 
+// Unduh file (PDF/CSV) secara andal: ambil via fetch (dengan auth token),
+// lalu simpan lewat blob + objectURL. Metode <a download> biasa sering diblokir
+// di lingkungan preview/iframe, jadi pakai cara ini.
+async function downloadFile(url, filename) {
+  const headers = {};
+  const token = getToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(authedUrl(url), { headers });
+  if (!res.ok) {
+    let msg = 'Gagal mengunduh file (' + res.status + ')';
+    try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) { /* bukan JSON */ }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = filename || 'file';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { a.remove(); try { URL.revokeObjectURL(objUrl); } catch (e) {} }, 4000);
+}
+
+async function downloadTemplate() {
+  try {
+    await downloadFile('/api/template.csv', 'template-import-pelanggan.csv');
+    toast('Template import berhasil diunduh.');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 /* ---------- Badges ---------- */
 const statusBadge = (s) => `<span class="badge b-${esc(s)}"><span class="dot"></span>${esc(s)}</span>`;
 const infraBadge = (s) => {
@@ -307,7 +338,7 @@ async function renderDashboard() {
         <div style="display:flex;flex-wrap:wrap;gap:10px">
           <button class="btn btn-primary" onclick="openImportModal()">⬆️ Import Data Pelanggan (CSV/XLSX)</button>
           <button class="btn btn-accent" onclick="openExportModal()">📄 Export PDF Laporan</button>
-          <a class="btn btn-outline" href="${authedUrl('/api/template.csv')}" download>📥 Unduh Template Import</a>
+          <button class="btn btn-outline" onclick="downloadTemplate()">📥 Unduh Template Import</button>
         </div>
       </div></div>` : ''}
       <div class="col-4"><div class="card card-pad">
@@ -396,7 +427,7 @@ async function renderKolektor() {
       </tr>`).join('') : `<tr><td colspan="6" class="empty">Belum ada kolektor. Klik "Tambah Kolektor".</td></tr>`}
       </tbody></table></div>
     </div>
-    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <strong>ID mengikuti data import Anda</strong> (wajib diisi &amp; unik). <a href="${authedUrl('/api/template.csv')}" download>Unduh template</a>.</div>`;
+    <div class="hint" style="margin-top:14px">💡 Import file CSV/XLSX untuk menambahkan banyak pelanggan sekaligus ke kolektor terpilih. Format kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code> — <strong>ID mengikuti data import Anda</strong> (wajib diisi &amp; unik). <a href="#" onclick="event.preventDefault();downloadTemplate()">Unduh template</a>.</div>`;
 }
 
 async function openKolektorModal(id) {
@@ -440,13 +471,11 @@ async function deleteKolektor(id) {
 
 async function exportPDF(id) {
   try {
-    const a = document.createElement('a');
-    a.href = authedUrl('/api/export/' + id + '/pdf');
-    a.download = 'laporan.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    toast('PDF sedang diunduh…');
+    const k = state.kolektor.find((x) => x.id === id);
+    const uname = k ? k.username : id;
+    const fname = 'laporan-' + uname + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    await downloadFile('/api/export/' + id + '/pdf', fname);
+    toast('Laporan PDF berhasil diunduh.');
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -466,7 +495,7 @@ async function openImportModal(preselectId) {
         <input class="input" type="file" id="imp-file" accept=".csv,.xlsx,.xls" /></div>
       <div class="hint" style="margin-bottom:12px">
         Kolom: <code>ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan</code>.
-        <strong>ID mengikuti data Anda</strong> (wajib diisi &amp; unik). <a href="${authedUrl('/api/template.csv')}" download>Unduh template CSV</a>.
+        <strong>ID mengikuti data Anda</strong> (wajib diisi &amp; unik). <a href="#" onclick="event.preventDefault();downloadTemplate()">Unduh template CSV</a>.
       </div>
       <div id="imp-result"></div>
     </div>
