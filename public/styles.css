@@ -64,16 +64,6 @@ code { background: #e2e8f0; padding: 1px 6px; border-radius: 6px; font-size: .85
   transition: border .15s, box-shadow .15s;
 }
 #login-form input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-.login-hint {
-  margin-top: 20px;
-  padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  font-size: 12.5px;
-  color: #475569;
-  line-height: 1.6;
-}
 
 /* ---------- Layout ---------- */
 #app { display: flex; min-height: 100vh; }
