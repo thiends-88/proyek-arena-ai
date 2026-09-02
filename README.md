@@ -27,12 +27,14 @@ Aplikasi web untuk mengelola data **kolektor** dan **pelanggan** (internet), len
 | Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
 | Jumlah Tagihan | angka (Rp) |
 
-## 🔑 Akun Demo
+## 🔑 Akun Awal
 
-| Peran | Username | Password |
-|-------|----------|----------|
-| Admin | `admin` | `admin123` |
-| Kolektor | `andi` / `budi` / `citra` | `kolektor123` |
+Saat pertama kali dijalankan, aplikasi membuat akun **contoh** (admin + 3 kolektor) beserta
+data pelanggan dummy di `data/db.json`. Kredensialnya **tidak lagi dicantumkan di README/UI**
+— lihat langkah pertamanya di **[DEPLOYMENT.md → bagian G. Keamanan & Akun](DEPLOYMENT.md)**,
+yang berisi cara langsung menggantinya.
+
+> ⚠️ **Ganti semua password bawaan sebelum aplikasi dipakai**, apalagi bila dipasang di server yang bisa diakses orang lain.
 
 ## 🚀 Menjalankan
 

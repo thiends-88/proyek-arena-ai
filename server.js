@@ -959,6 +959,13 @@ app.get('*', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Aplikasi berjalan di http://0.0.0.0:${PORT}`);
-  console.log('Login admin: admin / admin123');
-  console.log('Login kolektor: andi|budi|citra / kolektor123');
+  // Tidak lagi mencetak kredensial ke log. Cukup beri peringatan bila masih ada akun
+  // yang memakai password bawaan data contoh.
+  try {
+    const db = loadDB();
+    const bawaan = (db.users || []).filter((u) => verifyPassword('admin123', u.password)).length;
+    if (bawaan > 0) {
+      console.log(`⚠️  ${bawaan} akun masih memakai password bawaan — ganti sebelum dipakai (ikon 🔑 di sidebar).`);
+    }
+  } catch { /* abaikan */ }
 });
