@@ -2,9 +2,10 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
   <title>Kolektor App — Manajemen Data Pelanggan</title>
-  <link rel="stylesheet" href="/styles.css?v=14" />
+  <link rel="stylesheet" href="/styles.css?v=15" />
   <script src="/vendor/chart.umd.js"></script>
 </head>
 <body>
@@ -34,13 +35,15 @@
 
   <!-- ============ APP ============ -->
   <div id="app" class="hidden">
+    <div id="sidebar-backdrop"></div>
     <aside id="sidebar">
       <div class="sidebar-brand">
         <div class="logo">📡</div>
-        <div>
+        <div class="brand-text">
           <div class="brand-name">Kolektor<span>App</span></div>
           <div class="brand-sub">Data Pelanggan</div>
         </div>
+        <button id="btn-sidebar-close" class="icon-btn sidebar-close" title="Tutup menu" aria-label="Tutup menu">✕</button>
       </div>
       <nav id="nav"></nav>
       <div class="sidebar-user">
@@ -56,7 +59,12 @@
 
     <main id="main">
       <header id="topbar">
-        <h2 id="page-title">Dashboard</h2>
+        <div class="topbar-left">
+          <button id="btn-menu" class="menu-btn" title="Menu" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+          <h2 id="page-title">Dashboard</h2>
+        </div>
         <div class="topbar-right" id="topbar-right"></div>
       </header>
       <div id="content" class="content"></div>
@@ -66,6 +74,6 @@
   <div id="modal-root"></div>
   <div id="toast-root"></div>
 
-  <script src="/app.js?v=14"></script>
+  <script src="/app.js?v=15"></script>
 </body>
 </html>

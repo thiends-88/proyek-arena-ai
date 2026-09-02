@@ -76,7 +76,7 @@ sudo git clone https://github.com/thiends-88/proyek-arena-ai.git kolektorapp
 cd kolektorapp
 
 # Pastikan ada di branch terbaru (branch sesi pengembangan)
-sudo git checkout arena/01a05b01-proyek-arena-ai
+sudo git checkout arena/01a05fcb-proyek-arena-ai
 
 # Beri hak akses ke user biasa (mis. user 'kolektor' atau user login Anda)
 sudo chown -R $USER:$USER /opt/kolektorapp
@@ -323,14 +323,22 @@ sudo systemctl start kolektorapp
 
 ## I. Update Aplikasi (saat ada versi baru)
 
+Versi terbaru (termasuk **tampilan responsive mobile**) ada di branch `arena/01a05fcb-proyek-arena-ai`.
+
 ```bash
 cd /opt/kolektorapp
-git pull origin arena/01a05b01-proyek-arena-ai
+git fetch origin
+git checkout arena/01a05fcb-proyek-arena-ai      # cukup sekali; selanjutnya langsung git pull
+git pull origin arena/01a05fcb-proyek-arena-ai
 npm install
 sudo systemctl restart kolektorapp
 ```
 
 > Data di `data/db.json` **tidak** terpengaruh oleh `git pull` (folder `data/` di-ignore git).
+
+> Setelah update, buka aplikasi di HP lalu **refresh** (tarik ke bawah / tekan ⟳). Jika tampilan lama masih
+> muncul, tutup tab browser lalu buka kembali — server sudah mengirim header no-cache sehingga file baru
+> otomatis dipakai.
 
 ---
 

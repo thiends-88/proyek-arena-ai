@@ -749,10 +749,18 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   .pill-putus { background:#e2e8f0; color:#475569; }
   .pill-cuti { background:#fef3c7; color:#b45309; }
   .foot { margin-top: 14px; font-size: 11px; color: #94a3b8; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  @media (max-width: 600px) {
+    body { padding: 14px; }
+    .head h1 { font-size: 17px; }
+    .table-scroll table { min-width: 640px; }
+  }
   @media print {
     body { padding: 0; }
     @page { size: A4 landscape; margin: 10mm; }
     .foot { display: none; }
+    .table-scroll { overflow: visible; }
+    .table-scroll table { min-width: 0; }
   }
 </style></head>
 <body>
@@ -773,10 +781,10 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.cuti}</div><div class="l">Cuti</div></div>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
-  <table>
+  <div class="table-scroll"><table>
     <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
-  </table>
+  </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
 </body></html>`;
 

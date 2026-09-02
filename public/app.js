@@ -395,10 +395,24 @@ function renderSidebar() {
     `<div class="nav-item ${state.view === n.id ? 'active' : ''}" data-view="${n.id}">
        <span class="ico">${n.ico}</span> ${esc(n.label)}
      </div>`).join('');
-  document.querySelectorAll('.nav-item').forEach((el) => el.addEventListener('click', () => go(el.dataset.view)));
+  document.querySelectorAll('.nav-item').forEach((el) => el.addEventListener('click', () => { closeSidebar(); go(el.dataset.view); }));
   $('#user-avatar').textContent = (u.name || '?').charAt(0).toUpperCase();
   $('#user-name').textContent = u.name;
   $('#user-role').textContent = u.role === 'admin' ? 'Administrator' : 'Kolektor';
+}
+
+/* ---------- Sidebar mobile (drawer) ---------- */
+// Di layar ≤ 900px sidebar disembunyikan dan dibuka lewat tombol ☰ di topbar.
+function openSidebar() {
+  document.body.classList.add('sidebar-open');
+  const b = $('#btn-menu'); if (b) b.setAttribute('aria-expanded', 'true');
+}
+function closeSidebar() {
+  document.body.classList.remove('sidebar-open');
+  const b = $('#btn-menu'); if (b) b.setAttribute('aria-expanded', 'false');
+}
+function toggleSidebar() {
+  if (document.body.classList.contains('sidebar-open')) closeSidebar(); else openSidebar();
 }
 
 function go(view, opts = {}) {
@@ -417,13 +431,16 @@ function go(view, opts = {}) {
 
 function renderTopbarActions(view) {
   const el = $('#topbar-right');
+  // Di layar kecil, label tombol dipersingkat ("＋ Tambah") agar muat di samping judul halaman.
+  const addBtn = (fn, objek) => `<button class="btn btn-primary" onclick="${fn}()">＋ Tambah<span class="hide-xs"> ${objek}</span></button>`;
+  const dateInfo = `<span class="hint">${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
   if (state.user.role === 'admin') {
-    if (view === 'kolektor') el.innerHTML = `<button class="btn btn-primary" onclick="openKolektorModal()">＋ Tambah Kolektor</button>`;
-    else if (view === 'pelanggan') el.innerHTML = `<button class="btn btn-primary" onclick="openPelangganModal()">＋ Tambah Pelanggan</button>`;
-    else el.innerHTML = `<span class="hint">${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
+    if (view === 'kolektor') el.innerHTML = addBtn('openKolektorModal', 'Kolektor');
+    else if (view === 'pelanggan') el.innerHTML = addBtn('openPelangganModal', 'Pelanggan');
+    else el.innerHTML = dateInfo;
   } else {
-    if (view === 'pelanggan') el.innerHTML = `<button class="btn btn-primary" onclick="openPelangganModal()">＋ Tambah Pelanggan</button>`;
-    else el.innerHTML = `<span class="hint">${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
+    if (view === 'pelanggan') el.innerHTML = addBtn('openPelangganModal', 'Pelanggan');
+    else el.innerHTML = dateInfo;
   }
 }
 
@@ -498,7 +515,7 @@ async function renderDashboard() {
       ${isAdmin ? `
       <div class="col-12"><div class="card card-pad">
         <div class="card-head"><div><div class="card-title">⚡ Aksi Cepat — Import &amp; Export Data Pelanggan</div><div class="card-sub">Kelola data pelanggan banyak sekaligus atau cetak laporan PDF</div></div></div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <div class="quick-actions">
           <button class="btn btn-primary" onclick="openImportModal()">⬆️ Import Data Pelanggan (CSV/XLSX)</button>
           <button class="btn btn-accent" onclick="openExportModal()">📄 Export PDF Laporan</button>
           <button class="btn btn-outline" onclick="downloadTemplate()">📥 Unduh Template Import</button>
@@ -534,14 +551,14 @@ async function renderDashboard() {
       </div></div>
       <div class="col-12"><div class="card card-pad">
         <div class="card-head"><div><div class="card-title">Rekap per Kolektor</div><div class="card-sub">Import &amp; export per kolektor</div></div></div>
-        <div class="table-wrap"><table class="data"><thead><tr>
+        <div class="table-wrap"><table class="data cards"><thead><tr>
           <th>Kolektor</th><th>Username</th><th class="num">Pelanggan</th><th class="num">Aktif</th><th class="num">Blokir</th><th class="num">Putus</th><th class="num">Cuti</th><th class="num">Total Tagihan</th><th style="width:230px">Aksi</th>
         </tr></thead><tbody>
         ${d.perKolektor.map((k) => `<tr>
-          <td><strong>${esc(k.nama)}</strong></td><td>${esc(k.username)}</td>
-          <td class="num">${k.totalPelanggan}</td><td class="num">${k.aktif}</td><td class="num">${k.blokir}</td><td class="num">${k.putus}</td><td class="num">${k.cuti}</td>
-          <td class="num"><strong>${fmtRp(k.totalTagihan)}</strong></td>
-          <td><div class="row-actions">
+          <td class="cell-title"><strong>${esc(k.nama)}</strong></td><td data-label="Username">${esc(k.username)}</td>
+          <td class="num" data-label="Pelanggan">${k.totalPelanggan}</td><td class="num" data-label="Aktif">${k.aktif}</td><td class="num" data-label="Blokir">${k.blokir}</td><td class="num" data-label="Putus">${k.putus}</td><td class="num" data-label="Cuti">${k.cuti}</td>
+          <td class="num" data-label="Total Tagihan"><strong>${fmtRp(k.totalTagihan)}</strong></td>
+          <td class="cell-actions"><div class="row-actions">
             <button class="btn btn-ghost btn-sm" onclick="openImportModal('${k.kolektorId}')">⬆️ Import</button>
             <button class="btn btn-accent btn-sm" onclick="exportPDF('${k.kolektorId}')">📄 Export PDF</button>
             <button class="btn btn-outline btn-sm" onclick="go('pelanggan', {kolektorId:'${k.kolektorId}'})">📋 Data</button>
@@ -570,22 +587,22 @@ async function renderKolektor() {
   state.kolektor = list;
 
   c.innerHTML = `
-    <div class="card">
-      <div class="table-wrap"><table class="data"><thead><tr>
+    <div class="card table-card">
+      <div class="table-wrap"><table class="data cards"><thead><tr>
         <th>#</th><th>Nama Kolektor</th><th>Username</th><th class="num">Jumlah Pelanggan</th><th class="num">Total Tagihan</th><th style="width:320px">Aksi</th>
       </tr></thead><tbody>
       ${list.length ? list.map((k, i) => `<tr>
-        <td>${i + 1}</td>
-        <td><div class="avatar" style="width:30px;height:30px;flex:0 0 30px;font-size:13px;display:inline-flex;vertical-align:middle;margin-right:8px">${esc(k.name.charAt(0).toUpperCase())}</div><strong>${esc(k.name)}</strong></td>
-        <td><code>${esc(k.username)}</code></td>
-        <td class="num">${k.jumlahPelanggan}</td>
-        <td class="num"><strong>${fmtRp(k.totalTagihan)}</strong></td>
-        <td><div class="row-actions">
+        <td class="hide-sm">${i + 1}</td>
+        <td class="cell-title"><div class="avatar" style="width:30px;height:30px;flex:0 0 30px;font-size:13px;display:inline-flex;vertical-align:middle;margin-right:8px">${esc(k.name.charAt(0).toUpperCase())}</div><strong>${esc(k.name)}</strong></td>
+        <td data-label="Username"><code>${esc(k.username)}</code></td>
+        <td class="num" data-label="Jumlah Pelanggan">${k.jumlahPelanggan}</td>
+        <td class="num" data-label="Total Tagihan"><strong>${fmtRp(k.totalTagihan)}</strong></td>
+        <td class="cell-actions"><div class="row-actions">
           <button class="btn btn-ghost btn-sm" onclick="go('pelanggan', {kolektorId:'${k.id}'})">📋 Lihat Data</button>
           <button class="btn btn-outline btn-sm" onclick="openImportModal('${k.id}')">⬆️ Import</button>
           <button class="btn btn-accent btn-sm" onclick="exportPDF('${k.id}')">📄 Export PDF</button>
-          <button class="btn btn-outline btn-sm" onclick="openKolektorModal('${k.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteKolektor('${k.id}')">🗑️</button>
+          <button class="btn btn-outline btn-sm" title="Edit" onclick="openKolektorModal('${k.id}')">✏️<span class="show-sm"> Edit</span></button>
+          <button class="btn btn-danger btn-sm" title="Hapus" onclick="deleteKolektor('${k.id}')">🗑️<span class="show-sm"> Hapus</span></button>
         </div></td>
       </tr>`).join('') : `<tr><td colspan="6" class="empty">Belum ada kolektor. Klik "Tambah Kolektor".</td></tr>`}
       </tbody></table></div>
@@ -775,7 +792,7 @@ function renderPelangganTable() {
   const pageRows = rows.slice(start, start + state.pageSize);
 
   const kolektorFilter = isAdmin ? `
-    <select class="input" id="pel-filter-kolektor" style="width:200px" onchange="setPelFilter('kolektorId', this.value)">
+    <select class="input toolbar-select" id="pel-filter-kolektor" onchange="setPelFilter('kolektorId', this.value)">
       <option value="all">Semua Kolektor</option>
       ${state.kolektor.map((k) => `<option value="${k.id}" ${f.kolektorId === k.id ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}
     </select>` : '';
@@ -786,26 +803,26 @@ function renderPelangganTable() {
       <div class="search-box"><input type="text" id="pel-search" placeholder="Cari nama / no HP / ID…" value="${esc(f.search)}" oninput="setPelFilter('search', this.value)" /></div>
       <div class="grow"></div>
       <span class="hint">${total} data</span>
-      <button class="btn btn-primary" onclick="openPelangganModal()">＋ Tambah Pelanggan</button>
+      <button class="btn btn-primary hide-sm" onclick="openPelangganModal()">＋ Tambah Pelanggan</button>
     </div>
-    <div class="card"><div class="table-wrap"><table class="data"><thead><tr>
+    <div class="card table-card"><div class="table-wrap"><table class="data cards"><thead><tr>
       <th>ID</th><th>Nama Pelanggan</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th class="num">Jumlah Tagihan</th>
       ${isAdmin ? '<th>Kolektor</th>' : ''}<th style="width:170px">Aksi</th>
     </tr></thead><tbody>
     ${pageRows.length ? pageRows.map((p) => `<tr>
-      <td><code>${esc(p.id)}</code></td>
-      <td><strong>${esc(p.nama)}</strong></td>
-      <td>${esc(p.noHp)}</td>
-      <td>${statusBadge(p.status)}</td>
-      <td>${infraBadge(p.infrastruktur)}</td>
-      <td>${tagihanBadge(p.tagihan)}</td>
-      <td>${kelompokBadge(p.kelompok)}</td>
-      <td class="num"><strong>${fmtRp(p.jumlahTagihan)}</strong></td>
-      ${isAdmin ? `<td>${esc(p.kolektorNama || '-')}</td>` : ''}
-      <td><div class="row-actions">
-        <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${jsAttr(p.id)}')">✏️</button>
-        <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${jsAttr(p.id)}')">💬</button>
-        <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${jsAttr(p.id)}')">🗑️</button>
+      <td data-label="ID"><code>${esc(p.id)}</code></td>
+      <td class="cell-title"><strong>${esc(p.nama)}</strong></td>
+      <td data-label="No HP / WA">${esc(p.noHp)}</td>
+      <td data-label="Status">${statusBadge(p.status)}</td>
+      <td data-label="Infrastruktur">${infraBadge(p.infrastruktur)}</td>
+      <td data-label="Tagihan">${tagihanBadge(p.tagihan)}</td>
+      <td data-label="Kelompok">${kelompokBadge(p.kelompok)}</td>
+      <td class="num" data-label="Jumlah Tagihan"><strong>${fmtRp(p.jumlahTagihan)}</strong></td>
+      ${isAdmin ? `<td data-label="Kolektor">${esc(p.kolektorNama || '-')}</td>` : ''}
+      <td class="cell-actions"><div class="row-actions">
+        <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${jsAttr(p.id)}')">✏️<span class="show-sm"> Edit</span></button>
+        <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${jsAttr(p.id)}')">💬<span class="show-sm"> Pesan</span></button>
+        <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${jsAttr(p.id)}')">🗑️<span class="show-sm"> Hapus</span></button>
       </div></td>
     </tr>`).join('') : `<tr><td colspan="${isAdmin ? 10 : 9}" class="empty"><div class="big">📭</div>Belum ada data pelanggan.</td></tr>`}
     </tbody></table></div></div>
@@ -960,8 +977,18 @@ function openMessageModal(id) {
 /* ---------- Init ---------- */
 async function init() {
   $('#login-form').addEventListener('submit', doLogin);
-  $('#btn-logout').addEventListener('click', doLogout);
-  $('#btn-password').addEventListener('click', openUbahPasswordModal);
+  $('#btn-logout').addEventListener('click', () => { closeSidebar(); doLogout(); });
+  $('#btn-password').addEventListener('click', () => { closeSidebar(); openUbahPasswordModal(); });
+
+  // Sidebar mobile: tombol ☰, tombol ✕, klik area gelap, tombol Escape, dan saat layar diperbesar
+  $('#btn-menu').addEventListener('click', toggleSidebar);
+  $('#btn-sidebar-close').addEventListener('click', closeSidebar);
+  $('#sidebar-backdrop').addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+  const mqDesktop = window.matchMedia('(min-width: 901px)');
+  const onMq = (e) => { if (e.matches) closeSidebar(); };
+  if (mqDesktop.addEventListener) mqDesktop.addEventListener('change', onMq);
+  else if (mqDesktop.addListener) mqDesktop.addListener(onMq); // Safari/WebView lama
   try {
     const { user } = await api('/api/me');
     state.user = user;
