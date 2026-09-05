@@ -16,23 +16,44 @@ Aplikasi web untuk mengelola data **kolektor** dan **pelanggan** (internet), len
 - Fitur per data pelanggan: **Edit**, **Hapus**, dan **Kirim pesan** ke pelanggan (via WhatsApp).
 
 ### 📋 Data Pelanggan (per kolektor)
-| Field | Nilai |
-|-------|-------|
-| ID | otomatis (PLG-0001, dst.) |
-| Nama Pelanggan | teks |
-| No HP / WA | teks |
-| Status | `aktif` · `blokir` · `putus` · `cuti` |
-| Infrastruktur | `wireless` · `fiber optic` |
-| Tagihan | `yes` · `no` · `free` |
-| Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
-| Jumlah Tagihan | angka (Rp) |
+Form input dibagi menjadi **3 bagian** — Identitas & Lokasi, Langganan & Layanan, Penagihan.
 
-## 🔑 Akun Demo
+| Field | Bagian | Nilai |
+|-------|--------|-------|
+| ID | Identitas | otomatis (`PLG-0001`, dst.) atau isi manual (mis. dari data import) |
+| Nama Pelanggan | Identitas | teks **(wajib)** |
+| No HP / WA | Identitas | teks **(wajib)** — pemisah dibersihkan otomatis, minimal 8 angka |
+| Alamat / Patok | Identitas | teks panjang |
+| Status | Langganan | `aktif` · `blokir` · `putus` · `cuti` |
+| Infrastruktur | Langganan | `wireless` · `fiber optic` |
+| Produk | Langganan | `internet` · `wifi.net` · `hotspot` · `dedicated` |
+| Kecepatan Paket | Langganan | teks, mis. `20 Mbps` |
+| Tanggal Pasang | Langganan | tanggal (pilih di kalender) |
+| Tagihan | Penagihan | `yes` · `no` · `free` |
+| Kelompok | Penagihan | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
+| Jumlah Tagihan | Penagihan | angka — diketik biasa, tampil otomatis `150.000` |
+| Jatuh Tempo | Penagihan | tanggal 1–28 tiap bulan |
+| Catatan | Penagihan | teks panjang (tidak ditampilkan di tabel, muncul di laporan PDF) |
 
-| Peran | Username | Password |
-|-------|----------|----------|
-| Admin | `admin` | `admin123` |
-| Kolektor | `andi` / `budi` / `citra` | `kolektor123` |
+> Semua field di atas **otomatis** ikut dipakai di: form input, tabel data, template import CSV/XLSX,
+> pencocokan kolom saat import, dan kolom laporan PDF/HTML.
+
+### 🔧 Menambah / memindah kolom
+Cukup edit **satu konfigurasi** di dua tempat (urutannya = urutan tampilan):
+- `public/app.js` → array `PELANGGAN_FIELDS` (label, tipe, ukuran, dan `section` tujuan) + `IMPORT_LABELS`
+- `server.js` → array `PELANGGAN_FIELDS` (label, tipe, alias kolom import, nilai default)
+
+Tipe yang tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `date` · `day` · `number`.
+Di tabel data, tombol **⚙️ Kolom** dipakai menampilkan/menyembunyikan kolom tambahan (preferensi disimpan di browser).
+
+## 🔑 Akun Awal
+
+Saat pertama kali dijalankan, aplikasi membuat akun **contoh** (admin + 3 kolektor) beserta
+data pelanggan dummy di `data/db.json`. Kredensialnya **tidak lagi dicantumkan di README/UI**
+— lihat langkah pertamanya di **[DEPLOYMENT.md → bagian G. Keamanan & Akun](DEPLOYMENT.md)**,
+yang berisi cara langsung menggantinya.
+
+> ⚠️ **Ganti semua password bawaan sebelum aplikasi dipakai**, apalagi bila dipasang di server yang bisa diakses orang lain.
 
 ## 🚀 Menjalankan
 

@@ -24,6 +24,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const STATUS_OPTIONS = ['aktif', 'blokir', 'putus', 'cuti'];
 const INFRA_OPTIONS = ['wireless', 'fiber optic'];
 const TAGIHAN_OPTIONS = ['yes', 'no', 'free'];
+const PRODUK_OPTIONS = ['internet', 'wifi.net', 'hotspot', 'dedicated'];
 const KELOMPOK_OPTIONS = [
   'pelanggan lancar',
   'minta invoice',
@@ -32,6 +33,35 @@ const KELOMPOK_OPTIONS = [
   'bayar ke kantor',
   'minta jemput',
 ];
+
+// ---------------------------------------------------------------------------
+// DEFINISI KOLOM PELANGGAN — satu sumber kebenaran.
+// Diurutkan sesuai urutan tampilan form & template import.
+//   label   : judul kolom di template CSV / header tabel
+//   type    : text | phone | longtext | select | number | currency | date | day
+//   virtual : tidak disimpan sebagai field data (mis. id, kolektorId)
+//   aliases : nama kolom lain yang diterima saat import CSV/XLSX
+// Untuk memindah/menambah urutan field, cukup edit array ini.
+// ---------------------------------------------------------------------------
+const PELANGGAN_FIELDS = [
+  { key: 'id', label: 'ID', type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
+  { key: 'nama', label: 'Nama Pelanggan', type: 'text', required: true, aliases: ['namapelanggan', 'pelanggan', 'nama'] },
+  { key: 'alamat', label: 'Alamat', type: 'longtext', aliases: ['alamatpelanggan', 'alm', 'lokasi', 'patok', 'alamatpatok'] },
+  { key: 'noHp', label: 'No HP / WA', type: 'phone', required: true, aliases: ['nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'nomor'] },
+  { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
+  { key: 'infrastruktur', label: 'Infrastruktur', type: 'select', options: INFRA_OPTIONS, aliases: ['infrastruktur', 'infra', 'jaringan'] },
+  { key: 'produk', label: 'Produk', type: 'select', options: PRODUK_OPTIONS, def: 'internet', aliases: ['produk', 'jenis', 'jenisproduk', 'paket'] },
+  { key: 'kecepatan', label: 'Kecepatan', type: 'text', placeholder: 'mis. 20 Mbps', aliases: ['kecepatan', 'kecepatanpaket', 'bandwidth', 'speed', 'paket'] },
+  { key: 'tanggalPasang', label: 'Tanggal Pasang', type: 'date', aliases: ['tanggalpasang', 'tglpasang', 'pasang', 'mulai', 'startdate'] },
+  { key: 'tagihan', label: 'Tagihan', type: 'select', options: TAGIHAN_OPTIONS, aliases: ['tagihan', 'statustagihan'] },
+  { key: 'kelompok', label: 'Kelompok', type: 'select', options: KELOMPOK_OPTIONS, aliases: ['kelompok', 'kategori', 'grup'] },
+  { key: 'jumlahTagihan', label: 'Jumlah Tagihan', type: 'currency', def: 0, aliases: ['jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
+  { key: 'jatuhTempo', label: 'Jatuh Tempo (tgl)', type: 'day', def: 15, aliases: ['jatuh tempo', 'jatuh tempo tanggal', 'tglbayar', 'haribayar', 'paymentday'] },
+  { key: 'catatan', label: 'Catatan', type: 'longtext', aliases: ['catatan', 'note', 'keterangan', 'ket', 'info'] },
+];
+
+const FIELD_BY_KEY = Object.fromEntries(PELANGGAN_FIELDS.map((f) => [f.key, f]));
+const DATA_FIELDS = PELANGGAN_FIELDS.filter((f) => !f.virtual);
 
 // ---------------------------------------------------------------------------
 // Data layer (JSON file)
@@ -143,6 +173,66 @@ function parseNumber(v) {
   if (v === null || v === undefined) return 0;
   const n = parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
   return isNaN(n) ? 0 : n;
+}
+
+// --- Parser untuk tipe field baru (dipakai form & import CSV/XLSX) ---
+function normText(v, max = 200) {
+  const s = String(v == null ? '' : v).trim();
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+function normProduk(v) {
+  const s = String(v || '').toLowerCase().trim();
+  if (!s) return null;
+  if (s.includes('dedicated') || s.includes('专线')) return 'dedicated';
+  if (s.includes('hotspot') || s === 'hs') return 'hotspot';
+  if (s.includes('wifi') || s.includes('wifinet')) return 'wifi.net';
+  if (s.includes('internet') || s.includes('isp')) return 'internet';
+  return PRODUK_OPTIONS.includes(s) ? s : null;
+}
+
+// Nomor HP/WA: buang pemisah (spasi, tanda hubung, titik ribuan dari Excel),
+// awali 0 bila ditulis 62…, dan tetap string agar nol di depan tidak hilang.
+function normPhone(v) {
+  if (v === null || v === undefined) return '';
+  let s = String(v).trim();
+  s = s.replace(/\.0+$/, '');            // 081234567890.0 (Excel) → 081234567890
+  s = s.replace(/[\s\-().]/g, '');       // pemisah
+  if (/^62\d+$/.test(s)) s = '0' + s.slice(2);
+  return s;
+}
+
+// Menerima 'YYYY-MM-DD', 'DD/MM/YYYY', 'DD-MM-YYYY', '31-12-2024', serial Excel,
+// atau tanggal bahasa Indonesia ('31/12/2024'). Keluaran selalu 'YYYY-MM-DD' atau ''.
+function normDate(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // nomor seri tanggal Excel (mis. 45323 → 2024-01-31), termasuk format XLSX 1900 dengan bug 1900
+  if (/^\d{4,6}$/.test(s)) {
+    const days = Number(s) - 1;
+    const d = new Date(Date.UTC(1899, 11, 31 + days));
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  const iso = s.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/);
+  if (iso) return `${iso[1]}-${String(iso[2]).padStart(2, '0')}-${String(iso[3]).padStart(2, '0')}`;
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+  if (dmy) {
+    let y = Number(dmy[3]);
+    if (y < 100) y += 2000;
+    return `${y}-${String(dmy[2]).padStart(2, '0')}-${String(dmy[1]).padStart(2, '0')}`;
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return '';
+}
+
+// Tanggal jatuh tempo: 1..28 (aman untuk semua bulan)
+function normDay(v) {
+  const n = parseNumber(v);
+  if (!n) return null;
+  return Math.min(28, Math.max(1, n));
 }
 
 function publicUser(u) {
@@ -415,17 +505,56 @@ app.get('/api/pelanggan', requireAuth, (req, res) => {
   res.json({ pelanggan: list.map((p) => ({ ...p, kolektorNama: kolektorNames[p.kolektorId] || '-' })) });
 });
 
+// Validasi berbasis PELANGGAN_FIELDS — label wajib & tipe diambil dari konfigurasi,
+// jadi menambah/memindah kolom tidak perlu mengubah fungsi ini.
 function validatePelanggan(body) {
-  const nama = String(body.nama || '').trim();
-  const noHp = String(body.noHp || '').trim();
-  if (!nama) return { error: 'Nama pelanggan wajib diisi.' };
-  if (!noHp) return { error: 'No HP/WA wajib diisi.' };
-  const status = STATUS_OPTIONS.includes(body.status) ? body.status : 'aktif';
-  const infrastruktur = INFRA_OPTIONS.includes(body.infrastruktur) ? body.infrastruktur : 'wireless';
-  const tagihan = TAGIHAN_OPTIONS.includes(body.tagihan) ? body.tagihan : 'no';
-  const kelompok = KELOMPOK_OPTIONS.includes(body.kelompok) ? body.kelompok : 'pelanggan lancar';
-  const jumlahTagihan = parseNumber(body.jumlahTagihan);
-  return { data: { nama, noHp, status, infrastruktur, tagihan, kelompok, jumlahTagihan } };
+  const data = {};
+  for (const f of DATA_FIELDS) {
+    const raw = body ? body[f.key] : undefined;
+    switch (f.type) {
+      case 'longtext':
+        data[f.key] = normText(raw, 500);
+        break;
+      case 'currency':
+        data[f.key] = parseNumber(raw);
+        break;
+      case 'number':
+        data[f.key] = parseNumber(raw);
+        break;
+      case 'date':
+        data[f.key] = normDate(raw);
+        break;
+      case 'day': {
+        const d = normDay(raw);
+        data[f.key] = d === null ? (f.def === undefined ? null : f.def) : d;
+        break;
+      }
+      case 'select': {
+        let val;
+        if (f.options === STATUS_OPTIONS) val = normStatus(raw) || f.def || 'aktif';
+        else if (f.options === INFRA_OPTIONS) val = normInfra(raw) || f.def || 'wireless';
+        else if (f.options === TAGIHAN_OPTIONS) val = normTagihan(raw) || f.def || 'no';
+        else if (f.options === KELOMPOK_OPTIONS) val = normKelompok(raw) || f.def || 'pelanggan lancar';
+        else if (f.options === PRODUK_OPTIONS) val = normProduk(raw) || f.def || 'internet';
+        else val = f.options.includes(String(raw).toLowerCase().trim()) ? String(raw).toLowerCase().trim() : (f.def || f.options[0]);
+        data[f.key] = val;
+        break;
+      }
+      case 'phone': {
+        const ph = normPhone(raw);
+        if (!ph) return { error: f.label + ' wajib diisi.' };
+        if (ph.replace(/\D/g, '').length < 8) return { error: 'No HP/WA tidak valid — minimal 8 angka.' };
+        data[f.key] = ph;
+        break;
+      }
+      default: {
+        const s = normText(raw);
+        if (f.required && !s) return { error: f.label + ' wajib diisi.' };
+        data[f.key] = s;
+      }
+    }
+  }
+  return { data };
 }
 
 app.post('/api/pelanggan', requireAuth, (req, res) => {
@@ -573,6 +702,39 @@ app.post('/api/restore', requireAuth, requireAdmin, upload.single('file'), (req,
 });
 
 // --- Import file (CSV / XLSX) ---
+// Perbaikan kehilangan angka nol di depan pada import:
+// sheet_to_json berubah menjadi number (mis. '081234567890' → 81234567890).
+// Bila teks asli sel (cell.w) memang berawalan 0, pakai teks itu.
+function keepTextNumbers(ws, rows) {
+  if (!ws || !ws['!ref']) return rows;
+  let range;
+  try { range = XLSX.utils.decode_range(ws['!ref']); } catch (e) { return rows; }
+  const header = [];
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const c = ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+    header[C - range.s.c] = c ? String(c.v) : '';
+  }
+  const numericCols = new Set();
+  rows.forEach((row) => {
+    Object.keys(row).forEach((label) => {
+      if (typeof row[label] === 'number' && Math.trunc(row[label]) === row[label]) numericCols.add(label);
+    });
+  });
+  if (!numericCols.size) return rows;
+  rows.forEach((row, i) => {
+    const r = range.s.r + 1 + i;
+    numericCols.forEach((label) => {
+      const col = header.findIndex((h) => String(h).trim().toLowerCase() === String(label).trim().toLowerCase());
+      if (col < 0) return;
+      const cell = ws[XLSX.utils.encode_cell({ r, c: range.s.c + col })];
+      if (!cell || cell.t !== 'n') return;
+      const rawText = cell.w != null ? String(cell.w) : String(cell.v);
+      if (/^0\d/.test(rawText)) row[label] = rawText;
+    });
+  });
+  return rows;
+}
+
 app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan.' });
   const kolektorId = req.body.kolektorId;
@@ -581,24 +743,22 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 
   let rows;
   try {
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    // raw: true → nilai mentah (tidak diformat) supaya angka tetap akurat.
+    rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+    rows = keepTextNumbers(ws, rows);
   } catch (e) {
     return res.status(400).json({ error: 'Gagal membaca file. Pastikan format CSV/XLSX benar.' });
   }
   if (!rows.length) return res.status(400).json({ error: 'File kosong / tidak ada baris data.' });
 
-  const FIELD_MAP = {
-    id: 'id',
-    nama: 'nama', namapelanggan: 'nama', namapelangggan: 'nama', pelanggan: 'nama',
-    nohp: 'noHp', hp: 'noHp', nohpwa: 'noHp', nowa: 'noHp', whatsapp: 'noHp', wa: 'noHp', notelepon: 'noHp', notelp: 'noHp', telepon: 'noHp', nomor: 'noHp',
-    status: 'status',
-    infrastruktur: 'infrastruktur', infra: 'infrastruktur',
-    tagihan: 'tagihan', statustagihan: 'tagihan',
-    kelompok: 'kelompok',
-    jumlahtagihan: 'jumlahTagihan', jumlah: 'jumlahTagihan', nominal: 'jumlahTagihan', nominaltagihan: 'jumlahTagihan', tagihanjumlah: 'jumlahTagihan',
-  };
+  // FIELD_MAP dibangun dari PELANGGAN_FIELDS.aliases → selalu sinkron dengan form/template.
+  const FIELD_MAP = {};
+  PELANGGAN_FIELDS.forEach((f) => {
+    const keys = [String(f.label).toLowerCase(), f.key, ...(f.aliases || [])];
+    keys.forEach((k) => { FIELD_MAP[normKey(k)] = f.key; });
+  });
 
   const imported = [];
   const errors = [];
@@ -631,13 +791,11 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
     }
     importedIds.add(id);
 
-    const status = normStatus(mapped.status) || 'aktif';
-    const infrastruktur = normInfra(mapped.infrastruktur) || 'wireless';
-    const tagihan = normTagihan(mapped.tagihan) || 'no';
-    const kelompok = normKelompok(mapped.kelompok) || 'pelanggan lancar';
-    const jumlahTagihan = parseNumber(mapped.jumlahTagihan);
+    // Validasi + normalisasi memakai aturan yang sama dengan form input
+    const v = validatePelanggan(mapped);
+    if (v.error) { errors.push(`Baris ${i + 2}: ${v.error}`); return; }
 
-    db.pelanggan.push({ id, kolektorId: k.id, nama, noHp, status, infrastruktur, tagihan, kelompok, jumlahTagihan, createdAt: new Date().toISOString() });
+    db.pelanggan.push({ id, kolektorId: k.id, ...v.data, createdAt: new Date().toISOString() });
     imported.push({ id, nama, noHp });
   });
 
@@ -646,17 +804,45 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 });
 
 // --- Template import ---
+// Header & baris contoh dibangun dari PELANGGAN_FIELDS, sehingga template selalu
+// sama dengan field yang ada di form input.
+function templateRows() {
+  const contoh = {
+    id: 'P-001', nama: 'Rudi Hartono', alamat: 'Jl. Merdeka No. 12, RT 02/RW 03',
+    noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', produk: 'internet',
+    kecepatan: '20 Mbps', tanggalPasang: '2024-01-15', tagihan: 'yes', kelompok: 'pelanggan lancar',
+    jumlahTagihan: '250000', jatuhTempo: '15', catatan: '',
+  };
+  const contoh2 = {
+    id: 'P-002', nama: 'Siti Aminah', alamat: 'Perum Griya Indah B-7',
+    noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', produk: 'wifi.net',
+    kecepatan: '15 Mbps', tanggalPasang: '2023-08-02', tagihan: 'no', kelompok: 'blokir dulu baru bayar',
+    jumlahTagihan: '0', jatuhTempo: '20', catatan: 'Minta pindah titik',
+  };
+  const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
+  const header = PELANGGAN_FIELDS.map((f) => f.label);
+  const rows = [contoh, contoh2].map((o) => PELANGGAN_FIELDS.map((f) => csvCell(o[f.key] == null ? '' : o[f.key])));
+  return { header, rows };
+}
+
 app.get('/api/template.csv', requireAuth, requireAdmin, (req, res) => {
-  const header = ['ID', 'Nama Pelanggan', 'No HP / WA', 'Status', 'Infrastruktur', 'Tagihan', 'Kelompok', 'Jumlah Tagihan'];
-  const contoh = [
-    ['P-001', 'Rudi Hartono', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000'],
-    ['P-002', 'Siti Aminah', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0'],
-  ];
-  const lines = [header.join(','), ...contoh.map((r) => r.join(','))];
+  const { header, rows } = templateRows();
+  const lines = [header.join(','), ...rows.map((r) => r.join(','))];
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="template-import-pelanggan.csv"');
   res.send('\uFEFF' + lines.join('\n'));
 });
+
+// Daftar kolom untuk frontend (dipakai form, tabel, dan pratinjau template)
+app.get('/api/fields', requireAuth, (req, res) => {
+  res.json({
+    fields: PELANGGAN_FIELDS.map((f) => ({
+      key: f.key, label: f.label, type: f.type, required: !!f.required, virtual: !!f.virtual,
+      placeholder: f.placeholder || '', def: f.def === undefined ? '' : f.def, options: f.options || null,
+    })),
+  });
+});
+
 
 // --- Dashboard / analisa ---
 function aggregate(list) {
@@ -715,12 +901,18 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
       <td class="c">${i + 1}</td>
       <td>${escHtml(p.id)}</td>
       <td>${escHtml(p.nama)}</td>
+      <td>${escHtml(p.alamat)}</td>
       <td>${escHtml(p.noHp)}</td>
       <td><span class="pill pill-${escHtml(p.status)}">${escHtml(p.status)}</span></td>
       <td>${escHtml(p.infrastruktur)}</td>
+      <td>${escHtml(p.produk)}</td>
+      <td>${escHtml(p.kecepatan)}</td>
+      <td>${escHtml(p.tanggalPasang)}</td>
       <td>${escHtml(p.tagihan)}</td>
       <td>${escHtml(p.kelompok)}</td>
       <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
+      <td class="c">${escHtml(p.jatuhTempo || '-')}</td>
+      <td>${escHtml(p.catatan)}</td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -753,7 +945,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   @media (max-width: 600px) {
     body { padding: 14px; }
     .head h1 { font-size: 17px; }
-    .table-scroll table { min-width: 640px; }
+    .table-scroll table { min-width: 1000px; }
   }
   @media print {
     body { padding: 0; }
@@ -782,8 +974,8 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
   <div class="table-scroll"><table>
-    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
+    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Produk</th><th>Kecepatan</th><th>Tgl Pasang</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Jatuh Tempo</th><th>Catatan</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="15">Tidak ada data.</td></tr>'}</tbody>
   </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
 </body></html>`;
@@ -813,7 +1005,9 @@ app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, re
 
 function generateKolektorPDF(kolektor, pelanggan) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+    // A4 landscape: kolom laporan bertambah (alamat, produk, kecepatan, tgl pasang,
+    // jatuh tempo, catatan) sehingga portrait sudah terlalu sempit.
+    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -868,14 +1062,20 @@ function generateKolektorPDF(kolektor, pelanggan) {
     // Tabel
     const cols = [
       { label: 'No', width: 22, align: 'center' },
-      { label: 'ID', width: 50, align: 'left' },
-      { label: 'Nama Pelanggan', width: 90, align: 'left' },
-      { label: 'No HP / WA', width: 76, align: 'left' },
-      { label: 'Status', width: 40, align: 'left' },
-      { label: 'Infra', width: 52, align: 'left' },
-      { label: 'Tagihan', width: 38, align: 'left' },
-      { label: 'Kelompok', width: 90, align: 'left' },
-      { label: 'Jumlah', width: 57, align: 'right' },
+      { label: 'ID', width: 52, align: 'left' },
+      { label: 'Nama', width: 92, align: 'left' },
+      { label: 'Alamat', width: 122, align: 'left' },
+      { label: 'No HP / WA', width: 74, align: 'left' },
+      { label: 'Status', width: 42, align: 'left' },
+      { label: 'Infra', width: 48, align: 'left' },
+      { label: 'Produk', width: 52, align: 'left' },
+      { label: 'Kecepatan', width: 52, align: 'left' },
+      { label: 'Pasang', width: 52, align: 'left' },
+      { label: 'Tagihan', width: 40, align: 'left' },
+      { label: 'Kelompok', width: 80, align: 'left' },
+      { label: 'Jumlah', width: 60, align: 'right' },
+      { label: 'Jatuh tempo', width: 42, align: 'center' },
+      { label: 'Catatan', width: 110, align: 'left' },
     ];
     const tableW = cols.reduce((s, c) => s + c.width, 0);
     const headerH = 18;
@@ -904,12 +1104,18 @@ function generateKolektorPDF(kolektor, pelanggan) {
         String(i + 1),
         p.id,
         p.nama,
+        p.alamat || '-',
         p.noHp,
         p.status,
         p.infrastruktur,
+        p.produk || '-',
+        p.kecepatan || '-',
+        p.tanggalPasang || '-',
         p.tagihan,
         p.kelompok,
         'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
+        p.jatuhTempo ? 'tgl ' + p.jatuhTempo : '-',
+        p.catatan || '-',
       ];
       // hitung tinggi baris
       let rowH = 12;
@@ -959,6 +1165,13 @@ app.get('*', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Aplikasi berjalan di http://0.0.0.0:${PORT}`);
-  console.log('Login admin: admin / admin123');
-  console.log('Login kolektor: andi|budi|citra / kolektor123');
+  // Tidak lagi mencetak kredensial ke log. Cukup beri peringatan bila masih ada akun
+  // yang memakai password bawaan data contoh.
+  try {
+    const db = loadDB();
+    const bawaan = (db.users || []).filter((u) => verifyPassword('admin123', u.password)).length;
+    if (bawaan > 0) {
+      console.log(`⚠️  ${bawaan} akun masih memakai password bawaan — ganti sebelum dipakai (ikon 🔑 di sidebar).`);
+    }
+  } catch { /* abaikan */ }
 });

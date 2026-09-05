@@ -75,8 +75,8 @@ cd /opt
 sudo git clone https://github.com/thiends-88/proyek-arena-ai.git kolektorapp
 cd kolektorapp
 
-# Pastikan ada di branch terbaru (branch sesi pengembangan)
-sudo git checkout arena/01a05fcb-proyek-arena-ai
+# Ambil branch stabil terbaru
+sudo git checkout main
 
 # Beri hak akses ke user biasa (mis. user 'kolektor' atau user login Anda)
 sudo chown -R $USER:$USER /opt/kolektorapp
@@ -126,10 +126,14 @@ Kalau muncul:
 
 ```
 Aplikasi berjalan di http://0.0.0.0:3000
-Login admin: admin / admin123
 ```
 
-berarti sukses. Buka `http://<IP-SERVER>:3000` di browser → login `admin` / `admin123`.
+berarti sukses. Buka `http://<IP-SERVER>:3000` di browser → halaman login akan tampil.
+
+> **Catatan:** pada pembuatan database pertama kali, aplikasi membuat akun & data **contoh**
+> (admin + 3 kolektor). Kredensial defaultnya sengaja **tidak** dicetak lagi ke log konsol
+> maupun ditampilkan di halaman login — ikuti bagian **G. Keamanan & Akun** di bawah untuk
+> menggantinya lebih dulu.
 
 > **PENTING:** Segera ganti password default di langkah Keamanan (bagian G) sebelum dipakai sungguhan.
 
@@ -142,7 +146,7 @@ Tekan `Ctrl+C` untuk berhenti dulu (nanti dijalankan sebagai service).
 > 💡 **Konsep database aplikasi ini:** semua data tersimpan dalam **satu file JSON**
 > di `data/db.json`. Folder `data/` **tidak ada di GitHub** (sengaja di-ignore). Saat
 > pertama kali dijalankan, aplikasi **membuat `data/db.json` otomatis** berisi data contoh
-> (demo). Untuk memindahkan data asli Anda, gunakan salah satu cara berikut.
+> (dummy). Untuk memindahkan data asli Anda, gunakan salah satu cara berikut.
 
 ### Cara A — Migrasi lewat file (paling akurat)
 
@@ -273,6 +277,10 @@ sudo nginx -t && sudo systemctl reload nginx
 
 **1. Ganti password admin** (akun `admin` / `admin123`):
 
+> ℹ️ Password bawaan ini hanya dipakai pada **pembuatan database pertama kali** dan sengaja
+> hanya didokumentasikan di panduan internal ini (tidak lagi muncul di README, halaman login,
+> maupun log konsol server). Setelah langkah di bawah dijalankan, nilai ini tidak berlaku lagi.
+
 - Login sebagai admin → klik ikon **🔑** di pojok kiri bawah (samping tombol keluar).
 - Isi **password lama** (`admin123`) → **password baru** → **ulangi password baru** → **Simpan**.
 
@@ -323,13 +331,25 @@ sudo systemctl start kolektorapp
 
 ## I. Update Aplikasi (saat ada versi baru)
 
-Versi terbaru (termasuk **tampilan responsive mobile**) ada di branch `arena/01a05fcb-proyek-arena-ai`.
+Versi stabil ada di branch `main`. Perkembangan terbaru sementara ada di branch sesi,
+mis. `arena/01a06009-proyek-arena-ai` (akan digabung ke `main` setelah mantap).
+
+**Kalau server Anda sebelumnya memakai branch sesi lama** (mis. `arena/01a05fcb-proyek-arena-ai`),
+ambil branch terbaru sekali saja:
 
 ```bash
 cd /opt/kolektorapp
 git fetch origin
-git checkout arena/01a05fcb-proyek-arena-ai      # cukup sekali; selanjutnya langsung git pull
-git pull origin arena/01a05fcb-proyek-arena-ai
+git checkout arena/01a06009-proyek-arena-ai      # cukup sekali
+npm install
+sudo systemctl restart kolektorapp
+```
+
+**Setelah itu, update rutin:**
+
+```bash
+cd /opt/kolektorapp
+git pull                      # atau: git pull origin arena/01a06009-proyek-arena-ai
 npm install
 sudo systemctl restart kolektorapp
 ```
