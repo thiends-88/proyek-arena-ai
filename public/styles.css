@@ -45,7 +45,7 @@ code { background: #e2e8f0; padding: 1px 6px; border-radius: 6px; font-size: .85
   max-width: 400px;
   background: var(--card);
   border-radius: 20px;
-  padding: 36px 32px;
+  padding: 36px 32px 40px;
   box-shadow: var(--shadow-lg);
 }
 .login-brand { text-align: center; margin-bottom: 24px; }
@@ -64,16 +64,6 @@ code { background: #e2e8f0; padding: 1px 6px; border-radius: 6px; font-size: .85
   transition: border .15s, box-shadow .15s;
 }
 #login-form input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-.login-hint {
-  margin-top: 20px;
-  padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  font-size: 12.5px;
-  color: #475569;
-  line-height: 1.6;
-}
 
 /* ---------- Layout ---------- */
 #app { display: flex; min-height: 100vh; }
@@ -287,6 +277,43 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-grid .full { grid-column: span 2; }
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } .form-grid .full { grid-column: span 1; } }
+
+/* ---------- Form pelanggan: pilihan done / belum ---------- */
+.seg2 { display: flex; gap: 6px; }
+.seg2-btn {
+  flex: 1; padding: 9px 10px; border: 1px solid var(--line); background: #f8fafc;
+  border-radius: 9px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer;
+  transition: all .14s ease;
+}
+.seg2-btn:hover { border-color: var(--primary); color: var(--primary); }
+.seg2-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(15, 118, 110, .25); }
+input[type=month].input { min-height: 42px; }
+.badge.b-done { background: #dcfce7; color: #15803d; }
+.badge-click { cursor: pointer; display: inline-block; border-radius: 999px; transition: transform .12s ease, box-shadow .12s ease; }
+.badge-click:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15,118,110,.22); outline: 1px dashed var(--primary); }
+.badge.b-todo { background: #f1f5f9; color: #64748b; }
+.form-grid { margin-bottom: 4px; }
+.field .fld-hint { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
+.field textarea.input { resize: vertical; min-height: 46px; line-height: 1.45; }
+.rp-wrap { position: relative; }
+.rp-wrap .rp {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 12.5px; font-weight: 700; color: var(--muted); pointer-events: none;
+}
+.rp-wrap .rp-input { padding-left: 34px; font-variant-numeric: tabular-nums; }
+.form-scroll { padding-top: 18px; }
+.modal-foot .foot-note { font-size: 11.5px; color: var(--muted); align-self: center; }
+
+/* Pemilih kolom tabel */
+.col-menu {
+  position: fixed; z-index: 200; width: 220px; padding: 10px;
+  max-height: 60vh; overflow-y: auto; box-shadow: var(--shadow-lg);
+}
+.col-menu-head { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 2px 4px 8px; }
+.col-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 5px 4px; border-radius: 7px; cursor: pointer; }
+.col-opt:hover { background: #f1f5f9; }
+.col-opt input { width: auto; flex: 0 0 auto; margin: 0; }
+.col-menu-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .field label { display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 6px; }
 .field label .req { color: var(--danger); }
 .form-error { color: #b91c1c; background: #fee2e2; border-radius: 8px; padding: 9px 12px; font-size: 13px; margin-bottom: 12px; }
@@ -455,7 +482,7 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
   .toast { max-width: none; }
 
   #login-screen { padding: 14px; }
-  .login-card { padding: 28px 20px; border-radius: 16px; }
+  .login-card { padding: 28px 20px 32px; border-radius: 16px; }
 }
 
 /* ---------- Hormati preferensi "kurangi gerakan" ---------- */

@@ -16,23 +16,54 @@ Aplikasi web untuk mengelola data **kolektor** dan **pelanggan** (internet), len
 - Fitur per data pelanggan: **Edit**, **Hapus**, dan **Kirim pesan** ke pelanggan (via WhatsApp).
 
 ### 📋 Data Pelanggan (per kolektor)
-| Field | Nilai |
-|-------|-------|
-| ID | otomatis (PLG-0001, dst.) |
-| Nama Pelanggan | teks |
-| No HP / WA | teks |
-| Status | `aktif` · `blokir` · `putus` · `cuti` |
-| Infrastruktur | `wireless` · `fiber optic` |
-| Tagihan | `yes` · `no` · `free` |
-| Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
-| Jumlah Tagihan | angka (Rp) |
+Form input **rata/flat** dengan urutan persis seperti template import — tidak ada bagian lain.
 
-## 🔑 Akun Demo
+| # | Field | Nilai |
+|---|-------|-------|
+| 1 | ID | otomatis (`PLG-0001`, dst.) — boleh diisi manual (ID dari data Anda, harus unik) |
+| 2 | Nama Pelanggan | teks **(wajib)** |
+| 3 | Alamat | teks (multi-baris) |
+| 4 | No HP / WA | teks — spasi/tanda hubung dibersihkan otomatis, `62…` → `0…` |
+| 5 | Status | `aktif` · `blokir` · `putus` · `cuti` |
+| 6 | Infrastruktur | `wireless` · `fiber optic` |
+| 7 | Tagihan | `yes` · `no` · `free` |
+| 8 | Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
+| 9 | Jumlah Tagihan | angka — diketik biasa, tampil otomatis `150.000` |
+| 10 | Bulan Tagihan | bulan + tahun — pilih `Agustus 2026` (input bulan), tersimpan `YYYY-MM` |
+| 11 | Pengiriman inv | **`done`** / **`belum`** |
+| 12 | Reminder1 | **`done`** / **`belum`** |
+| 13 | Reminder2 | **`done`** / **`belum`** |
+| 14 | Reminder3 | **`done`** / **`belum`** |
+| 15 | Reminder4 | **`done`** / **`belum`** |
 
-| Peran | Username | Password |
-|-------|----------|----------|
-| Admin | `admin` | `admin123` |
-| Kolektor | `andi` / `budi` / `citra` | `kolektor123` |
+> Kolom ke-11 s/d 15 hanya punya dua nilai. Saat import, nilai apa pun yang berarti selesai
+> (`done`, `selesai`, `sudah`, `ya`, `1`, `ok`, `sent`) dibaca sebagai `done`; sisanya `belum`.
+Bulan Tagihan juga menerima tulisan bebas: `Agustus 2026`, `agu 26`, `8/2026`, `2026-08` → disimpan `2026-08`.
+
+**Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk
+menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import ·
+laporan PDF/HTML. Di tabel, badge `belum` bisa **diklik** untuk menandai `done` tanpa membuka form.
+
+### 🔧 Menambah / memindah / menghapus kolom
+Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
+- `public/app.js` → `PELANGGAN_FIELDS` (label, tipe, `size: 'full'|'half'`, `def`, `required`)
+  — header template CSV (`IMPORT_LABELS`) mengikuti array ini secara otomatis
+- `server.js` → `PELANGGAN_FIELDS` (label, tipe, `aliases` untuk pencocokan kolom import, `def`)
+
+Tipe tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `month` · `day` · `done` · `number`.
+
+> ⚠️ Menghapus field dari `server.js` menghentikan perawatannya; data lama field itu tetap
+> ada di `data/db.json` tetapi tidak ditampilkan lagi dan akan tertimpa nilai default saat
+> record diedit. Backup dulu lewat menu **💾 Backup & Restore** sebelum mengubah struktur.
+
+## 🔑 Akun Awal
+
+Saat pertama kali dijalankan, aplikasi membuat akun **contoh** (admin + 3 kolektor) beserta
+data pelanggan dummy di `data/db.json`. Kredensialnya **tidak lagi dicantumkan di README/UI**
+— lihat langkah pertamanya di **[DEPLOYMENT.md → bagian G. Keamanan & Akun](DEPLOYMENT.md)**,
+yang berisi cara langsung menggantinya.
+
+> ⚠️ **Ganti semua password bawaan sebelum aplikasi dipakai**, apalagi bila dipasang di server yang bisa diakses orang lain.
 
 ## 🚀 Menjalankan
 
