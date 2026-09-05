@@ -16,35 +16,44 @@ Aplikasi web untuk mengelola data **kolektor** dan **pelanggan** (internet), len
 - Fitur per data pelanggan: **Edit**, **Hapus**, dan **Kirim pesan** ke pelanggan (via WhatsApp).
 
 ### 📋 Data Pelanggan (per kolektor)
-Form input dibagi menjadi **3 bagian** — Identitas & Lokasi, Langganan & Layanan, Penagihan.
+Form input **rata/flat** dengan urutan persis seperti template import — tidak ada bagian lain.
 
-| Field | Bagian | Nilai |
-|-------|--------|-------|
-| ID | Identitas | otomatis (`PLG-0001`, dst.) atau isi manual (mis. dari data import) |
-| Nama Pelanggan | Identitas | teks **(wajib)** |
-| No HP / WA | Identitas | teks **(wajib)** — pemisah dibersihkan otomatis, minimal 8 angka |
-| Alamat / Patok | Identitas | teks panjang |
-| Status | Langganan | `aktif` · `blokir` · `putus` · `cuti` |
-| Infrastruktur | Langganan | `wireless` · `fiber optic` |
-| Produk | Langganan | `internet` · `wifi.net` · `hotspot` · `dedicated` |
-| Kecepatan Paket | Langganan | teks, mis. `20 Mbps` |
-| Tanggal Pasang | Langganan | tanggal (pilih di kalender) |
-| Tagihan | Penagihan | `yes` · `no` · `free` |
-| Kelompok | Penagihan | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
-| Jumlah Tagihan | Penagihan | angka — diketik biasa, tampil otomatis `150.000` |
-| Jatuh Tempo | Penagihan | tanggal 1–28 tiap bulan |
-| Catatan | Penagihan | teks panjang (tidak ditampilkan di tabel, muncul di laporan PDF) |
+| # | Field | Nilai |
+|---|-------|-------|
+| 1 | ID | otomatis (`PLG-0001`, dst.) — boleh diisi manual (ID dari data Anda, harus unik) |
+| 2 | Nama Pelanggan | teks **(wajib)** |
+| 3 | Alamat | teks (multi-baris) |
+| 4 | No HP / WA | teks — spasi/tanda hubung dibersihkan otomatis, `62…` → `0…` |
+| 5 | Status | `aktif` · `blokir` · `putus` · `cuti` |
+| 6 | Infrastruktur | `wireless` · `fiber optic` |
+| 7 | Tagihan | `yes` · `no` · `free` |
+| 8 | Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
+| 9 | Jumlah Tagihan | angka — diketik biasa, tampil otomatis `150.000` |
+| 10 | Jatuh Tempo (tgl) | angka 1–28 (tanggal tagihan tiap bulan) |
+| 11 | Pengiriman inv | **`done`** / **`belum`** |
+| 12 | Reminder1 | **`done`** / **`belum`** |
+| 13 | Reminder2 | **`done`** / **`belum`** |
+| 14 | Reminder3 | **`done`** / **`belum`** |
+| 15 | Reminder4 | **`done`** / **`belum`** |
 
-> Semua field di atas **otomatis** ikut dipakai di: form input, tabel data, template import CSV/XLSX,
-> pencocokan kolom saat import, dan kolom laporan PDF/HTML.
+> Kolom ke-11 s/d 15 hanya punya dua nilai. Saat import, nilai apa pun yang berarti selesai
+> (`done`, `selesai`, `sudah`, `ya`, `1`, `ok`, `sent`) dibaca sebagai `done`; sisanya `belum`.
 
-### 🔧 Menambah / memindah kolom
-Cukup edit **satu konfigurasi** di dua tempat (urutannya = urutan tampilan):
-- `public/app.js` → array `PELANGGAN_FIELDS` (label, tipe, ukuran, dan `section` tujuan) + `IMPORT_LABELS`
-- `server.js` → array `PELANGGAN_FIELDS` (label, tipe, alias kolom import, nilai default)
+**Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk
+menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import ·
+laporan PDF/HTML. Di tabel, badge `belum` bisa **diklik** untuk menandai `done` tanpa membuka form.
 
-Tipe yang tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `date` · `day` · `number`.
-Di tabel data, tombol **⚙️ Kolom** dipakai menampilkan/menyembunyikan kolom tambahan (preferensi disimpan di browser).
+### 🔧 Menambah / memindah / menghapus kolom
+Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
+- `public/app.js` → `PELANGGAN_FIELDS` (label, tipe, `size: 'full'|'half'`, `def`, `required`)
+  — header template CSV (`IMPORT_LABELS`) mengikuti array ini secara otomatis
+- `server.js` → `PELANGGAN_FIELDS` (label, tipe, `aliases` untuk pencocokan kolom import, `def`)
+
+Tipe tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `day` · `done` · `number`.
+
+> ⚠️ Menghapus field dari `server.js` menghentikan perawatannya; data lama field itu tetap
+> ada di `data/db.json` tetapi tidak ditampilkan lagi dan akan tertimpa nilai default saat
+> record diedit. Backup dulu lewat menu **💾 Backup & Restore** sebelum mengubah struktur.
 
 ## 🔑 Akun Awal
 

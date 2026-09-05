@@ -24,7 +24,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const STATUS_OPTIONS = ['aktif', 'blokir', 'putus', 'cuti'];
 const INFRA_OPTIONS = ['wireless', 'fiber optic'];
 const TAGIHAN_OPTIONS = ['yes', 'no', 'free'];
-const PRODUK_OPTIONS = ['internet', 'wifi.net', 'hotspot', 'dedicated'];
+const DONE_OPTIONS = ['belum', 'done'];   // dipakai: Pengiriman inv & Reminder1–4
 const KELOMPOK_OPTIONS = [
   'pelanggan lancar',
   'minta invoice',
@@ -38,26 +38,27 @@ const KELOMPOK_OPTIONS = [
 // DEFINISI KOLOM PELANGGAN — satu sumber kebenaran.
 // Diurutkan sesuai urutan tampilan form & template import.
 //   label   : judul kolom di template CSV / header tabel
-//   type    : text | phone | longtext | select | number | currency | date | day
+//   type    : text | phone | longtext | select | number | currency | day | done
 //   virtual : tidak disimpan sebagai field data (mis. id, kolektorId)
 //   aliases : nama kolom lain yang diterima saat import CSV/XLSX
 // Untuk memindah/menambah urutan field, cukup edit array ini.
 // ---------------------------------------------------------------------------
 const PELANGGAN_FIELDS = [
-  { key: 'id', label: 'ID', type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
-  { key: 'nama', label: 'Nama Pelanggan', type: 'text', required: true, aliases: ['namapelanggan', 'pelanggan', 'nama'] },
-  { key: 'alamat', label: 'Alamat', type: 'longtext', aliases: ['alamatpelanggan', 'alm', 'lokasi', 'patok', 'alamatpatok'] },
-  { key: 'noHp', label: 'No HP / WA', type: 'phone', required: true, aliases: ['nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'nomor'] },
-  { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
+  { key: 'id',        label: 'ID',               type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
+  { key: 'nama',      label: 'Nama Pelanggan',   type: 'text', required: true, aliases: ['namapelanggan', 'pelanggan', 'nama'] },
+  { key: 'alamat',    label: 'Alamat',           type: 'text', aliases: ['alamat', 'alamatpelanggan', 'alm', 'almat', 'address', 'lokasi', 'patok'] },
+  { key: 'noHp',      label: 'No HP / WA',       type: 'phone', aliases: ['nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'nomor'] },
+  { key: 'status',    label: 'Status',           type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
   { key: 'infrastruktur', label: 'Infrastruktur', type: 'select', options: INFRA_OPTIONS, aliases: ['infrastruktur', 'infra', 'jaringan'] },
-  { key: 'produk', label: 'Produk', type: 'select', options: PRODUK_OPTIONS, def: 'internet', aliases: ['produk', 'jenis', 'jenisproduk', 'paket'] },
-  { key: 'kecepatan', label: 'Kecepatan', type: 'text', placeholder: 'mis. 20 Mbps', aliases: ['kecepatan', 'kecepatanpaket', 'bandwidth', 'speed', 'paket'] },
-  { key: 'tanggalPasang', label: 'Tanggal Pasang', type: 'date', aliases: ['tanggalpasang', 'tglpasang', 'pasang', 'mulai', 'startdate'] },
-  { key: 'tagihan', label: 'Tagihan', type: 'select', options: TAGIHAN_OPTIONS, aliases: ['tagihan', 'statustagihan'] },
-  { key: 'kelompok', label: 'Kelompok', type: 'select', options: KELOMPOK_OPTIONS, aliases: ['kelompok', 'kategori', 'grup'] },
+  { key: 'tagihan',   label: 'Tagihan',          type: 'select', options: TAGIHAN_OPTIONS, aliases: ['tagihan', 'statustagihan'] },
+  { key: 'kelompok',  label: 'Kelompok',         type: 'select', options: KELOMPOK_OPTIONS, aliases: ['kelompok', 'kategori', 'grup'] },
   { key: 'jumlahTagihan', label: 'Jumlah Tagihan', type: 'currency', def: 0, aliases: ['jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
-  { key: 'jatuhTempo', label: 'Jatuh Tempo (tgl)', type: 'day', def: 15, aliases: ['jatuh tempo', 'jatuh tempo tanggal', 'tglbayar', 'haribayar', 'paymentday'] },
-  { key: 'catatan', label: 'Catatan', type: 'longtext', aliases: ['catatan', 'note', 'keterangan', 'ket', 'info'] },
+  { key: 'jatuhTempo', label: 'Jatuh Tempo (tgl)', type: 'day', def: 15, aliases: ['jatuh tempo', 'tglbayar', 'haribayar', 'paymentday', 'jatuh tempo tanggal'] },
+  { key: 'pengirimanInv', label: 'Pengiriman inv', type: 'done', def: 'belum', aliases: ['pengirimaninv', 'kiriminv', 'kirim', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1'] },
+  { key: 'reminder1', label: 'Reminder1', type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
+  { key: 'reminder2', label: 'Reminder2', type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
+  { key: 'reminder3', label: 'Reminder3', type: 'done', def: 'belum', aliases: ['reminder3', 'reminder 3', 'rem3', 'pengingat3'] },
+  { key: 'reminder4', label: 'Reminder4', type: 'done', def: 'belum', aliases: ['reminder4', 'reminder 4', 'rem4', 'pengingat4'] },
 ];
 
 const FIELD_BY_KEY = Object.fromEntries(PELANGGAN_FIELDS.map((f) => [f.key, f]));
@@ -181,14 +182,13 @@ function normText(v, max = 200) {
   return s.length > max ? s.slice(0, max) : s;
 }
 
-function normProduk(v) {
-  const s = String(v || '').toLowerCase().trim();
-  if (!s) return null;
-  if (s.includes('dedicated') || s.includes('专线')) return 'dedicated';
-  if (s.includes('hotspot') || s === 'hs') return 'hotspot';
-  if (s.includes('wifi') || s.includes('wifinet')) return 'wifi.net';
-  if (s.includes('internet') || s.includes('isp')) return 'internet';
-  return PRODUK_OPTIONS.includes(s) ? s : null;
+// done | belum — menerima 'done','selesai','ya','1','sudah','ok' dan 'belum','',0
+function normDone(v, def) {
+  const s = String(v == null ? '' : v).toLowerCase().trim();
+  if (s === '') return DONE_OPTIONS.includes(def) ? def : 'belum';
+  if (['done', 'selesai', 'sudah', 'ya', 'y', 'ok', '1', 'true', 'kirim', 'terkirim', 'sent'].includes(s)) return 'done';
+  if (['belum', 'no', 'n', '0', 'false', 'batal', 'pending'].includes(s)) return 'belum';
+  return DONE_OPTIONS.includes(s) ? s : (DONE_OPTIONS.includes(def) ? def : 'belum');
 }
 
 // Nomor HP/WA: buang pemisah (spasi, tanda hubung, titik ribuan dari Excel),
@@ -306,16 +306,28 @@ function seedDB() {
     else if (tagihan === 'free') jumlahTagihan = 0;
 
     const noHp = '08' + String(1200000000 + Math.floor(rnd() * 879999999)).padStart(10, '0');
+    const done = (p) => (rnd() < p ? 'done' : 'belum');
+    const alamat = 'Jl. ' + pick(['Merdeka', 'Melati', 'Anggrek', 'Kenanga', 'Dahlia', 'Mawar', 'Flamboyan', 'Cempaka'])
+      + ' No. ' + (1 + Math.floor(rnd() * 80)) + ', RT ' + String(1 + Math.floor(rnd() * 9)).padStart(2, '0');
+    const pengirimanInv = tagihan === 'yes' ? done(0.55) : 'belum';
+    const jmlReminder = tagihan === 'yes' ? Math.floor(rnd() * 5) : Math.floor(rnd() * 3);
     pelanggan.push({
       id: 'PLG-' + String(i + 1).padStart(4, '0'),
       kolektorId: kolektor.id,
       nama,
+      alamat,
       noHp,
       status,
       infrastruktur,
       tagihan,
       kelompok,
       jumlahTagihan,
+      jatuhTempo: 1 + Math.floor(rnd() * 25),
+      pengirimanInv,
+      reminder1: jmlReminder >= 1 ? 'done' : 'belum',
+      reminder2: jmlReminder >= 2 ? 'done' : 'belum',
+      reminder3: jmlReminder >= 3 ? 'done' : 'belum',
+      reminder4: jmlReminder >= 4 ? 'done' : 'belum',
       createdAt: new Date().toISOString(),
     });
   });
@@ -521,8 +533,8 @@ function validatePelanggan(body) {
       case 'number':
         data[f.key] = parseNumber(raw);
         break;
-      case 'date':
-        data[f.key] = normDate(raw);
+      case 'done':
+        data[f.key] = normDone(raw, f.def);
         break;
       case 'day': {
         const d = normDay(raw);
@@ -535,15 +547,13 @@ function validatePelanggan(body) {
         else if (f.options === INFRA_OPTIONS) val = normInfra(raw) || f.def || 'wireless';
         else if (f.options === TAGIHAN_OPTIONS) val = normTagihan(raw) || f.def || 'no';
         else if (f.options === KELOMPOK_OPTIONS) val = normKelompok(raw) || f.def || 'pelanggan lancar';
-        else if (f.options === PRODUK_OPTIONS) val = normProduk(raw) || f.def || 'internet';
         else val = f.options.includes(String(raw).toLowerCase().trim()) ? String(raw).toLowerCase().trim() : (f.def || f.options[0]);
         data[f.key] = val;
         break;
       }
       case 'phone': {
         const ph = normPhone(raw);
-        if (!ph) return { error: f.label + ' wajib diisi.' };
-        if (ph.replace(/\D/g, '').length < 8) return { error: 'No HP/WA tidak valid — minimal 8 angka.' };
+        if (ph && ph.replace(/\D/g, '').length < 8) return { error: 'No HP/WA tidak valid — minimal 8 angka.' };
         data[f.key] = ph;
         break;
       }
@@ -809,15 +819,15 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 function templateRows() {
   const contoh = {
     id: 'P-001', nama: 'Rudi Hartono', alamat: 'Jl. Merdeka No. 12, RT 02/RW 03',
-    noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', produk: 'internet',
-    kecepatan: '20 Mbps', tanggalPasang: '2024-01-15', tagihan: 'yes', kelompok: 'pelanggan lancar',
-    jumlahTagihan: '250000', jatuhTempo: '15', catatan: '',
+    noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', tagihan: 'yes',
+    kelompok: 'pelanggan lancar', jumlahTagihan: '250000', jatuhTempo: '15',
+    pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const contoh2 = {
     id: 'P-002', nama: 'Siti Aminah', alamat: 'Perum Griya Indah B-7',
-    noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', produk: 'wifi.net',
-    kecepatan: '15 Mbps', tanggalPasang: '2023-08-02', tagihan: 'no', kelompok: 'blokir dulu baru bayar',
-    jumlahTagihan: '0', jatuhTempo: '20', catatan: 'Minta pindah titik',
+    noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', tagihan: 'no',
+    kelompok: 'blokir dulu baru bayar', jumlahTagihan: '0', jatuhTempo: '20',
+    pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
   const header = PELANGGAN_FIELDS.map((f) => f.label);
@@ -905,14 +915,15 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
       <td>${escHtml(p.noHp)}</td>
       <td><span class="pill pill-${escHtml(p.status)}">${escHtml(p.status)}</span></td>
       <td>${escHtml(p.infrastruktur)}</td>
-      <td>${escHtml(p.produk)}</td>
-      <td>${escHtml(p.kecepatan)}</td>
-      <td>${escHtml(p.tanggalPasang)}</td>
       <td>${escHtml(p.tagihan)}</td>
       <td>${escHtml(p.kelompok)}</td>
       <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
       <td class="c">${escHtml(p.jatuhTempo || '-')}</td>
-      <td>${escHtml(p.catatan)}</td>
+      <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">R1 ${escHtml(p.reminder1 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">R2 ${escHtml(p.reminder2 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">R3 ${escHtml(p.reminder3 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">R4 ${escHtml(p.reminder4 || 'belum')}</span></td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -939,13 +950,15 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   .pill-aktif { background:#dcfce7; color:#15803d; }
   .pill-blokir { background:#fee2e2; color:#b91c1c; }
   .pill-putus { background:#e2e8f0; color:#475569; }
+  .pill-done { background:#dcfce7; color:#15803d; }
+  .pill-todo { background:#f1f5f9; color:#64748b; }
   .pill-cuti { background:#fef3c7; color:#b45309; }
   .foot { margin-top: 14px; font-size: 11px; color: #94a3b8; }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   @media (max-width: 600px) {
     body { padding: 14px; }
     .head h1 { font-size: 17px; }
-    .table-scroll table { min-width: 1000px; }
+    .table-scroll table { min-width: 900px; }
   }
   @media print {
     body { padding: 0; }
@@ -974,8 +987,8 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
   <div class="table-scroll"><table>
-    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Produk</th><th>Kecepatan</th><th>Tgl Pasang</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Jatuh Tempo</th><th>Catatan</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="15">Tidak ada data.</td></tr>'}</tbody>
+    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Jatuh Tempo</th><th>Pengiriman inv</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="16">Tidak ada data.</td></tr>'}</tbody>
   </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
 </body></html>`;
@@ -1063,19 +1076,20 @@ function generateKolektorPDF(kolektor, pelanggan) {
     const cols = [
       { label: 'No', width: 22, align: 'center' },
       { label: 'ID', width: 52, align: 'left' },
-      { label: 'Nama', width: 92, align: 'left' },
-      { label: 'Alamat', width: 122, align: 'left' },
-      { label: 'No HP / WA', width: 74, align: 'left' },
-      { label: 'Status', width: 42, align: 'left' },
-      { label: 'Infra', width: 48, align: 'left' },
-      { label: 'Produk', width: 52, align: 'left' },
-      { label: 'Kecepatan', width: 52, align: 'left' },
-      { label: 'Pasang', width: 52, align: 'left' },
-      { label: 'Tagihan', width: 40, align: 'left' },
-      { label: 'Kelompok', width: 80, align: 'left' },
-      { label: 'Jumlah', width: 60, align: 'right' },
-      { label: 'Jatuh tempo', width: 42, align: 'center' },
-      { label: 'Catatan', width: 110, align: 'left' },
+      { label: 'Nama Pelanggan', width: 96, align: 'left' },
+      { label: 'Alamat', width: 150, align: 'left' },
+      { label: 'No HP / WA', width: 78, align: 'left' },
+      { label: 'Status', width: 44, align: 'left' },
+      { label: 'Infrastruktur', width: 62, align: 'left' },
+      { label: 'Tagihan', width: 42, align: 'left' },
+      { label: 'Kelompok', width: 88, align: 'left' },
+      { label: 'Jumlah Tagihan', width: 72, align: 'right' },
+      { label: 'Jatuh Tempo', width: 46, align: 'center' },
+      { label: 'Kirim inv', width: 48, align: 'center' },
+      { label: 'Rem1', width: 34, align: 'center' },
+      { label: 'Rem2', width: 34, align: 'center' },
+      { label: 'Rem3', width: 34, align: 'center' },
+      { label: 'Rem4', width: 34, align: 'center' },
     ];
     const tableW = cols.reduce((s, c) => s + c.width, 0);
     const headerH = 18;
@@ -1105,17 +1119,18 @@ function generateKolektorPDF(kolektor, pelanggan) {
         p.id,
         p.nama,
         p.alamat || '-',
-        p.noHp,
+        p.noHp || '-',
         p.status,
         p.infrastruktur,
-        p.produk || '-',
-        p.kecepatan || '-',
-        p.tanggalPasang || '-',
         p.tagihan,
         p.kelompok,
         'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
         p.jatuhTempo ? 'tgl ' + p.jatuhTempo : '-',
-        p.catatan || '-',
+        p.pengirimanInv || 'belum',
+        p.reminder1 || 'belum',
+        p.reminder2 || 'belum',
+        p.reminder3 || 'belum',
+        p.reminder4 || 'belum',
       ];
       // hitung tinggi baris
       let rowH = 12;

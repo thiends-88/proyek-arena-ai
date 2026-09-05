@@ -278,18 +278,20 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-grid .full { grid-column: span 2; }
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } .form-grid .full { grid-column: span 1; } }
 
-/* ---------- Form pelanggan: bagian (section) ---------- */
-.form-section + .form-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-.form-section-head {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
-  color: var(--primary); margin-bottom: 12px;
+/* ---------- Form pelanggan: pilihan done / belum ---------- */
+.seg2 { display: flex; gap: 6px; }
+.seg2-btn {
+  flex: 1; padding: 9px 10px; border: 1px solid var(--line); background: #f8fafc;
+  border-radius: 9px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer;
+  transition: all .14s ease;
 }
-.form-section-head .fsi {
-  width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px;
-  background: var(--primary-light); display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px;
-}
+.seg2-btn:hover { border-color: var(--primary); color: var(--primary); }
+.seg2-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(15, 118, 110, .25); }
+.badge.b-done { background: #dcfce7; color: #15803d; }
+.badge-click { cursor: pointer; display: inline-block; border-radius: 999px; transition: transform .12s ease, box-shadow .12s ease; }
+.badge-click:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15,118,110,.22); outline: 1px dashed var(--primary); }
+.badge.b-todo { background: #f1f5f9; color: #64748b; }
+.form-grid { margin-bottom: 4px; }
 .field .fld-hint { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
 .field textarea.input { resize: vertical; min-height: 46px; line-height: 1.45; }
 .rp-wrap { position: relative; }
@@ -311,8 +313,6 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .col-opt:hover { background: #f1f5f9; }
 .col-opt input { width: auto; flex: 0 0 auto; margin: 0; }
 .col-menu-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
-.badge.b-neutral { background: #eef2ff; color: #3730a3; }
-.badge.b-speed { background: #ecfeff; color: #155e75; }
 .field label { display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 6px; }
 .field label .req { color: var(--danger); }
 .form-error { color: #b91c1c; background: #fee2e2; border-radius: 8px; padding: 9px 12px; font-size: 13px; margin-bottom: 12px; }

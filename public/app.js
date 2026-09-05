@@ -5,7 +5,7 @@ const OPTIONS = {
   status: ['aktif', 'blokir', 'putus', 'cuti'],
   infrastruktur: ['wireless', 'fiber optic'],
   tagihan: ['yes', 'no', 'free'],
-  produk: ['internet', 'wifi.net', 'hotspot', 'dedicated'],
+  done: ['belum', 'done'],
   kelompok: [
     'pelanggan lancar',
     'minta invoice',
@@ -17,43 +17,36 @@ const OPTIONS = {
 };
 
 /* ---------- Konfigurasi form & kolom pelanggan ----------
- * Satu array untuk TATA LETAK form, KOLOM tabel, dan TEMPLATE import.
+ * SATU daftar untuk: urutan field di form input, kolom tabel data, dan header
+ * template import CSV. Urutan array = urutan tampilan (rata/flat, tanpa bagian).
  *   key        : nama field di database
- *   label      : judul di form/tabel/template CSV
- *   type       : text | longtext | select | currency | date | day
- *   section    : id bagian tempat field ditampilkan (lihat PELANGGAN_SECTIONS)
- *   size       : 'full' = selebar 1 baris, 'half' = setengah baris
- *   colSpan    : 1 | 2 kolom tabel yang digabung
- *   table      : false = tidak ditampilkan di tabel daftar
- *   required   : wajib diisi (ditandai * dan divalidasi)
- * Untuk memindah posisi field: tukar urutannya, atau ubah `section`/`size`.
+ *   label      : judul di form, tabel, dan template CSV
+ *   type       : text | phone | longtext | select | currency | day | done
+ *                (done → hanya dua pilihan: done / belum)
+ *   size       : 'full' = selebar 2 kolom, 'half' = setengah baris
+ *   required   : wajib diisi
+ * Menghapus kolom dari semuanya: hapus barisnya di sini DAN di server.js.
  */
-const PELANGGAN_SECTIONS = [
-  { id: 'identitas', title: 'Identitas & Lokasi', icon: '👤' },
-  { id: 'langganan', title: 'Langganan & Layanan', icon: '📶' },
-  { id: 'tagihan', title: 'Penagihan', icon: '💰' },
-];
-
 const PELANGGAN_FIELDS = [
-  { key: 'id', label: 'ID', type: 'text', section: 'identitas', size: 'half', placeholder: 'kosongkan → otomatis', hint: 'Diisi otomatis bila kosong' },
-  { key: 'nama', label: 'Nama Pelanggan', type: 'text', section: 'identitas', size: 'half', required: true, placeholder: 'Nama lengkap', aliases: ['nama pelanggan', 'pelanggan'] },
-  { key: 'noHp', label: 'No HP / WA', type: 'phone', section: 'identitas', size: 'half', required: true, placeholder: '08xxxxxxxxxx', inputmode: 'tel', hint: 'Minimal 8 angka', aliases: ['nohp', 'no hp / wa', 'hp', 'wa', 'whatsapp'] },
-  { key: 'alamat', label: 'Alamat / Patok', type: 'longtext', section: 'identitas', size: 'full', placeholder: 'Jalan, No. Rumah, RT/RW, Desa/Kelurahan', aliases: ['alamat', 'alm', 'lokasi', 'patok'] },
-  { key: 'status', label: 'Status', type: 'select', options: OPTIONS.status, section: 'langganan', size: 'half', def: 'aktif' },
-  { key: 'infrastruktur', label: 'Infrastruktur', type: 'select', options: OPTIONS.infrastruktur, section: 'langganan', size: 'half', def: 'wireless' },
-  { key: 'produk', label: 'Produk', type: 'select', options: OPTIONS.produk, section: 'langganan', size: 'half', def: 'internet' },
-  { key: 'kecepatan', label: 'Kecepatan Paket', type: 'text', section: 'langganan', size: 'half', placeholder: 'mis. 20 Mbps' },
-  { key: 'tanggalPasang', label: 'Tanggal Pasang', type: 'date', section: 'langganan', size: 'half' },
-  { key: 'tagihan', label: 'Tagihan', type: 'select', options: OPTIONS.tagihan, section: 'tagihan', size: 'half', def: 'no' },
-  { key: 'kelompok', label: 'Kelompok', type: 'select', options: OPTIONS.kelompok, section: 'tagihan', size: 'half', def: 'pelanggan lancar', colSpan: 2 },
-  { key: 'jumlahTagihan', label: 'Jumlah Tagihan (Rp)', type: 'currency', section: 'tagihan', size: 'half', def: 0 },
-  { key: 'jatuhTempo', label: 'Jatuh Tempo (tanggal)', type: 'day', section: 'tagihan', size: 'half', def: 15, hint: '1–28' },
-  { key: 'catatan', label: 'Catatan', type: 'longtext', section: 'tagihan', size: 'full', placeholder: 'Info tambahan, keluhan, perjanjian…', table: false },
+  { key: 'id',            label: 'ID',                type: 'text',     size: 'half', placeholder: 'kosongkan → otomatis', hint: 'diisi otomatis bila kosong' },
+  { key: 'nama',          label: 'Nama Pelanggan',    type: 'text',     size: 'full', required: true, placeholder: 'Nama lengkap' },
+  { key: 'alamat',        label: 'Alamat',            type: 'longtext', size: 'full', placeholder: 'Jalan, No. Rumah, RT/RW, Desa' },
+  { key: 'noHp',          label: 'No HP / WA',        type: 'phone',    size: 'half', placeholder: '08xxxxxxxxxx', inputmode: 'tel', hint: 'minimal 8 angka' },
+  { key: 'status',        label: 'Status',            type: 'select', options: OPTIONS.status,        size: 'half', def: 'aktif' },
+  { key: 'infrastruktur', label: 'Infrastruktur',     type: 'select', options: OPTIONS.infrastruktur, size: 'half', def: 'wireless' },
+  { key: 'tagihan',       label: 'Tagihan',            type: 'select', options: OPTIONS.tagihan,       size: 'half', def: 'no' },
+  { key: 'kelompok',      label: 'Kelompok',          type: 'select', options: OPTIONS.kelompok,      size: 'half', def: 'pelanggan lancar' },
+  { key: 'jumlahTagihan', label: 'Jumlah Tagihan',    type: 'currency', size: 'half', def: 0 },
+  { key: 'jatuhTempo',    label: 'Jatuh Tempo (tgl)', type: 'day',      size: 'half', def: 15, hint: '1–28' },
+  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',     size: 'half', def: 'belum' },
+  { key: 'reminder1',     label: 'Reminder1', type: 'done', size: 'half', def: 'belum' },
+  { key: 'reminder2',     label: 'Reminder2', type: 'done', size: 'half', def: 'belum' },
+  { key: 'reminder3',     label: 'Reminder3', type: 'done', size: 'half', def: 'belum' },
+  { key: 'reminder4',     label: 'Reminder4', type: 'done', size: 'half', def: 'belum' },
 ];
 
-// Label kolom untuk template import CSV (harus sama dengan backend)
-const IMPORT_LABELS = ['ID', 'Nama Pelanggan', 'Alamat', 'No HP / WA', 'Status', 'Infrastruktur', 'Produk', 'Kecepatan', 'Tanggal Pasang', 'Tagihan', 'Kelompok', 'Jumlah Tagihan', 'Jatuh Tempo (tgl)', 'Catatan'];
-
+// Header template import CSV — diambil otomatis dari urutan di atas
+const IMPORT_LABELS = PELANGGAN_FIELDS.map((f) => f.label);
 
 const PALETTE = ['#0f766e', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#64748b', '#14b8a6', '#f97316', '#ec4899'];
 
@@ -200,8 +193,8 @@ async function copyText(text) {
 // Isi template import (di-generate di sisi klien agar selalu bisa diakses, bahkan tanpa unduhan).
 function templateCSV() {
   const rows = [
-    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'internet', '20 Mbps', '2024-01-15', 'yes', 'pelanggan lancar', '250000', '15', ''],
-    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'wifi.net', '15 Mbps', '2023-08-02', 'no', 'blokir dulu baru bayar', '0', '20', 'Minta pindah titik'],
+    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '15', 'done', 'done', 'belum', 'belum', 'belum'],
+    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '20', 'belum', 'belum', 'belum', 'belum', 'belum'],
   ];
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
   const lines = [IMPORT_LABELS.join(','), ...rows.map((r) => r.map(csvCell).join(','))];
@@ -817,7 +810,8 @@ async function renderPelanggan(opts = {}) {
 
 /* ---------- Kolom tabel (dikendalikan PELANGGAN_FIELDS + preferensi user) ---------- */
 const COL_KEY = 'kolektorapp.pelColumns.v1';
-const DEFAULT_ON = ['id', 'nama', 'noHp', 'status', 'infrastruktur', 'tagihan', 'kelompok', 'jumlahTagihan'];
+const DEFAULT_ON = ['id', 'nama', 'alamat', 'noHp', 'status', 'infrastruktur', 'tagihan', 'kelompok',
+  'jumlahTagihan', 'jatuhTempo', 'pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'];
 
 function visibleColumns() {
   let saved = null;
@@ -878,14 +872,6 @@ function toggleColumnMenu() {
   }, 0);
 }
 
-const fmtTanggalID = (s) => {
-  if (!s) return '-';
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return esc(s);
-  return d.getDate() + ' ' + BULAN_ID_SHORT[d.getMonth()] + ' ' + d.getFullYear();
-};
-const BULAN_ID_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-
 function renderCell(f, p) {
   const v = p[f.key];
   switch (f.key) {
@@ -896,11 +882,15 @@ function renderCell(f, p) {
     case 'tagihan': return tagihanBadge(v);
     case 'kelompok': return kelompokBadge(v);
     case 'jumlahTagihan': return `<strong>${fmtRp(v)}</strong>`;
-    case 'produk': return v ? `<span class="badge b-neutral">${esc(v)}</span>` : '-';
-    case 'kecepatan': return v ? `<span class="badge b-speed">${esc(v)}</span>` : '-';
-    case 'tanggalPasang': return fmtTanggalID(v);
     case 'jatuhTempo': return v ? `<strong>tgl ${esc(v)}</strong>` : '-';
-    default: return v ? esc(v) : '-';
+    default:
+      if (f.type === 'done') {
+        const isDone = v === 'done';
+        const inner = isDone ? '<span class="badge b-done">✓ done</span>' : '<span class="badge b-todo">belum</span>';
+        return isDone ? inner
+          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(p.id)}','${f.key}')">${inner}</span>`;
+      }
+      return v ? esc(v) : '-';
   }
 }
 
@@ -1006,9 +996,13 @@ function renderFormField(f, p, isAdmin) {
     case 'day':
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
         <input class="${cls}" id="${id}" type="number" min="1" max="28" value="${esc(val)}" /></div>`;
-    case 'date':
+    case 'done': {
+      const opts = (f.options || OPTIONS.done);
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
-        <input class="${cls}" id="${id}" type="date" value="${esc(val)}" /></div>`;
+        <div class="seg2" id="${id}" data-val="${esc(val)}">
+          ${opts.map((o) => `<button type="button" class="seg2-btn ${String(o) === String(val) ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
+        </div></div>`;
+    }
     default:
       const phoneAttr = f.type === 'phone' ? ' data-phone' : '';
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
@@ -1017,19 +1011,12 @@ function renderFormField(f, p, isAdmin) {
   }
 }
 
-// Susun field menjadi bagian-bagian (section) sesuai `section` di konfigurasi.
-function renderFormSections(p, isAdmin) {
-  const extra = [];
-  if (isAdmin) extra.push({ key: 'kolektorId', label: 'Kolektor', type: 'text', section: 'identitas', size: 'full', required: false });
-  const all = PELANGGAN_FIELDS.concat(extra);
-  return PELANGGAN_SECTIONS.map((sec) => {
-    const fields = all.filter((f) => (f.section || 'lain') === sec.id);
-    if (!fields.length) return '';
-    return `<div class="form-section">
-      <div class="form-section-head"><span class="fsi">${sec.icon}</span>${esc(sec.title)}</div>
-      <div class="form-grid">${fields.map((f) => renderFormField(f, p, isAdmin)).join('')}</div>
-    </div>`;
-  }).join('');
+// Susunan form: rata/flat, urutan = urutan konfigurasi. Kolektor ditaruh di akhir
+// (khusus admin) agar 16 kolom utama tetap persis seperti template import.
+function renderFormFields(p, isAdmin) {
+  const fields = PELANGGAN_FIELDS.slice();
+  if (isAdmin) fields.push({ key: 'kolektorId', label: 'Kolektor', type: 'text', size: 'full', required: false });
+  return `<div class="form-grid">${fields.map((f) => renderFormField(f, p, isAdmin)).join('')}</div>`;
 }
 
 // Ambil nilai form → payload (angka Rp dilepas titik tisinya)
@@ -1039,6 +1026,7 @@ function collectFormPayload(isAdmin) {
     if (f.key === 'id') return;
     const el = document.getElementById(fieldInput(f));
     if (!el) return;
+    if (f.type === 'done') { payload[f.key] = el.dataset.val || f.def; return; }
     payload[f.key] = f.type === 'currency' ? String(el.value).replace(/\D/g, '') : el.value;
   });
   if (isAdmin) {
@@ -1054,7 +1042,9 @@ function validateFormClient(isAdmin) {
   PELANGGAN_FIELDS.forEach((f) => {
     if (!f.required) return;
     const el = document.getElementById(fieldInput(f));
-    if (!el || !String(el.value).trim()) missing.push(f.label);
+    if (!el) return;
+    const v = f.type === 'done' ? (el.dataset.val || '') : String(el.value).trim();
+    if (!v) missing.push(f.label);
   });
   if (missing.length) return 'Belum diisi: ' + missing.join(', ') + '.';
   const hp = document.getElementById(fieldInput('noHp'));
@@ -1072,7 +1062,7 @@ function openPelangganModal(id) {
     <div class="modal-head"><h3>${p ? '✏️' : '＋'} ${title}</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body form-scroll">
       <div id="pl-error" class="form-error hidden"></div>
-      ${renderFormSections(p, isAdmin)}
+      ${renderFormFields(p, isAdmin)}
     </div>
     <div class="modal-foot">
       <span class="foot-note hide-sm">Kolom bertanda <span class="req">*</span> wajib diisi</span>
@@ -1088,6 +1078,15 @@ function openPelangganModal(id) {
       inp.value = digits ? Number(digits).toLocaleString('id-ID') : '0';
     });
     inp.addEventListener('focus', () => inp.select());
+  });
+  // tombol done / belum
+  document.querySelectorAll('.seg2').forEach((wrap) => {
+    wrap.querySelectorAll('.seg2-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        wrap.dataset.val = btn.dataset.v;
+        wrap.querySelectorAll('.seg2-btn').forEach((b) => b.classList.toggle('on', b === btn));
+      });
+    });
   });
   // bersih-bersih input nomor HP/WA (buang karakter non-angka, spasi akan dirapikan server)
   document.querySelectorAll('[data-phone]').forEach((inp) => {
@@ -1113,6 +1112,23 @@ function openPelangganModal(id) {
     } catch (e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
   });
 }
+
+// Toggle cepat done ↔ belum langsung dari tabel (PUT menimpa semua field, jadi kirim utuh)
+async function toggleDoneField(id, key) {
+  const p = state.pelanggan.find((x) => x.id === id);
+  if (!p) return;
+  const payload = {};
+  PELANGGAN_FIELDS.forEach((f) => { if (f.key !== 'id') payload[f.key] = p[f.key]; });
+  payload[key] = p[key] === 'done' ? 'belum' : 'done';
+  if (state.user.role === 'admin' && p.kolektorId) payload.kolektorId = p.kolektorId;
+  try {
+    await api('/api/pelanggan/' + enc(id), { method: 'PUT', body: JSON.stringify(payload) });
+    await renderPelanggan();
+    toast(fLabel(key) + ': ' + (payload[key] === 'done' ? 'done ✓' : 'belum'));
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+const fLabel = (key) => (PELANGGAN_FIELDS.find((f) => f.key === key) || {}).label || key;
 
 async function deletePelanggan(id) {
   const ok = await confirmDialog('Hapus Pelanggan', 'Yakin hapus data pelanggan ini? Tindakan tidak bisa dibatalkan.');
