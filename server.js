@@ -53,7 +53,7 @@ const PELANGGAN_FIELDS = [
   { key: 'tagihan',   label: 'Tagihan',          type: 'select', options: TAGIHAN_OPTIONS, aliases: ['tagihan', 'statustagihan'] },
   { key: 'kelompok',  label: 'Kelompok',         type: 'select', options: KELOMPOK_OPTIONS, aliases: ['kelompok', 'kategori', 'grup'] },
   { key: 'jumlahTagihan', label: 'Jumlah Tagihan', type: 'currency', def: 0, aliases: ['jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
-  { key: 'jatuhTempo', label: 'Jatuh Tempo (tgl)', type: 'day', def: 15, aliases: ['jatuh tempo', 'tglbayar', 'haribayar', 'paymentday', 'jatuh tempo tanggal'] },
+  { key: 'bulanTagihan', label: 'Bulan Tagihan', type: 'month', def: '', aliases: ['bulan tagihan', 'bulantagihan', 'bulan', 'periode', 'period', 'tagihan bulan', 'billing month', 'billingmonth'] },
   { key: 'pengirimanInv', label: 'Pengiriman inv', type: 'done', def: 'belum', aliases: ['pengirimaninv', 'kiriminv', 'kirim', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1'] },
   { key: 'reminder1', label: 'Reminder1', type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
   { key: 'reminder2', label: 'Reminder2', type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
@@ -228,6 +228,66 @@ function normDate(v) {
   return '';
 }
 
+// Bulan tagihan: menerima 'YYYY-MM', 'Agustus 2026', '08/2026', 'agu26', '8-2026'
+// → keluaran 'YYYY-MM' (string) atau '' bila tidak dikenali.
+const BULAN_ALIAS = {
+  jan: 1, januari: 1, january: 1, janv: 1,
+  feb: 2, peb: 2, februari: 2, pebruari: 2, february: 2,
+  mar: 3, maret: 3, march: 3,
+  apr: 4, april: 4,
+  mei: 5, may: 5,
+  jun: 6, juni: 6, june: 6,
+  jul: 7, juli: 7, july: 7,
+  agu: 8, agt: 8, agustus: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  okt: 10, oct: 10, oktober: 10, october: 10,
+  nov: 11, november: 11,
+  des: 12, dec: 12, desember: 12, december: 12,
+};
+const BULAN_LABEL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function normMonth(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 7);
+
+  const s0 = String(v).trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!s0 || s0 === '0' || s0 === '-') return '';
+
+  let y = null, mo = null;
+  let m = s0.match(/^(\d{4})([-/.])(\d{1,2})(?:\2?(\d{1,2}))?$/);      // 2026-08 | 2026-08-15
+  if (m) { y = +m[1]; mo = +m[3]; }
+  if (y === null) {
+    m = s0.match(/^(\d{1,2})([-/.])(\d{2,4})$/);                         // 8/2026 | 08-26
+    if (m) { mo = +m[1]; y = +m[3]; if (y < 100) y += 2000; }
+  }
+  if (y === null) {
+    m = s0.match(/^(\d{4})[ ](\d{1,2})$/);                               // 2026 08
+    if (m) { y = +m[1]; mo = +m[2]; }
+  }
+  if (y === null) {
+    m = s0.match(/^(\d{2,4})[ .-]*([a-z]+)\.?$/);                        // 2026 agustus
+    if (m && BULAN_ALIAS[m[2]] !== undefined) { y = +m[1]; if (y < 100) y += 2000; mo = BULAN_ALIAS[m[2]]; }
+  }
+  if (y === null) {
+    m = s0.match(/^([a-z]+)\.? ?(\d{2,4})$/);                             // agustus 2026 | agu. 26
+    if (m && BULAN_ALIAS[m[1]] !== undefined) { y = +m[2]; if (y < 100) y += 2000; mo = BULAN_ALIAS[m[1]]; }
+  }
+  if (y === null) return '';
+  if (!(mo >= 1 && mo <= 12) || !(y >= 1990 && y <= 2199)) return '';
+  return y + '-' + String(mo).padStart(2, '0');
+}
+
+// 'YYYY-MM' → 'AGUSTUS 2026' (untuk laporan & tampilan)
+function fmtMonthID(iso) {
+  if (!iso) return '-';
+  const m = String(iso).match(/^(\d{4})-(\d{1,2})/);
+  if (!m) return String(iso);
+  const idx = Number(m[2]) - 1;
+  if (idx < 0 || idx > 11) return String(iso);
+  return BULAN_LABEL[idx].toUpperCase() + ' ' + m[1];
+}
+
 // Tanggal jatuh tempo: 1..28 (aman untuk semua bulan)
 function normDay(v) {
   const n = parseNumber(v);
@@ -322,7 +382,7 @@ function seedDB() {
       tagihan,
       kelompok,
       jumlahTagihan,
-      jatuhTempo: 1 + Math.floor(rnd() * 25),
+      bulanTagihan: (() => { const d = new Date(); d.setMonth(d.getMonth() - Math.floor(rnd() * 3)); return d.toISOString().slice(0, 7); })(),
       pengirimanInv,
       reminder1: jmlReminder >= 1 ? 'done' : 'belum',
       reminder2: jmlReminder >= 2 ? 'done' : 'belum',
@@ -535,6 +595,9 @@ function validatePelanggan(body) {
         break;
       case 'done':
         data[f.key] = normDone(raw, f.def);
+        break;
+      case 'month':
+        data[f.key] = normMonth(raw);
         break;
       case 'day': {
         const d = normDay(raw);
@@ -820,13 +883,13 @@ function templateRows() {
   const contoh = {
     id: 'P-001', nama: 'Rudi Hartono', alamat: 'Jl. Merdeka No. 12, RT 02/RW 03',
     noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', tagihan: 'yes',
-    kelompok: 'pelanggan lancar', jumlahTagihan: '250000', jatuhTempo: '15',
+    kelompok: 'pelanggan lancar', jumlahTagihan: '250000', bulanTagihan: '2026-08',
     pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const contoh2 = {
     id: 'P-002', nama: 'Siti Aminah', alamat: 'Perum Griya Indah B-7',
     noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', tagihan: 'no',
-    kelompok: 'blokir dulu baru bayar', jumlahTagihan: '0', jatuhTempo: '20',
+    kelompok: 'blokir dulu baru bayar', jumlahTagihan: '0', bulanTagihan: '2026-07',
     pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
@@ -918,7 +981,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
       <td>${escHtml(p.tagihan)}</td>
       <td>${escHtml(p.kelompok)}</td>
       <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
-      <td class="c">${escHtml(p.jatuhTempo || '-')}</td>
+      <td class="c">${escHtml(fmtMonthID(p.bulanTagihan))}</td>
       <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span></td>
       <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">R1 ${escHtml(p.reminder1 || 'belum')}</span></td>
       <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">R2 ${escHtml(p.reminder2 || 'belum')}</span></td>
@@ -987,7 +1050,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
   <div class="table-scroll"><table>
-    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Jatuh Tempo</th><th>Pengiriman inv</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th></tr></thead>
+    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Bulan Tagihan</th><th>Pengiriman inv</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="16">Tidak ada data.</td></tr>'}</tbody>
   </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
@@ -1084,7 +1147,7 @@ function generateKolektorPDF(kolektor, pelanggan) {
       { label: 'Tagihan', width: 42, align: 'left' },
       { label: 'Kelompok', width: 88, align: 'left' },
       { label: 'Jumlah Tagihan', width: 72, align: 'right' },
-      { label: 'Jatuh Tempo', width: 46, align: 'center' },
+      { label: 'Bulan Tagihan', width: 74, align: 'center' },
       { label: 'Kirim inv', width: 48, align: 'center' },
       { label: 'Rem1', width: 34, align: 'center' },
       { label: 'Rem2', width: 34, align: 'center' },
@@ -1125,7 +1188,7 @@ function generateKolektorPDF(kolektor, pelanggan) {
         p.tagihan,
         p.kelompok,
         'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
-        p.jatuhTempo ? 'tgl ' + p.jatuhTempo : '-',
+        fmtMonthID(p.bulanTagihan),
         p.pengirimanInv || 'belum',
         p.reminder1 || 'belum',
         p.reminder2 || 'belum',

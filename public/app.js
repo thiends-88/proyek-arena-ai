@@ -21,7 +21,7 @@ const OPTIONS = {
  * template import CSV. Urutan array = urutan tampilan (rata/flat, tanpa bagian).
  *   key        : nama field di database
  *   label      : judul di form, tabel, dan template CSV
- *   type       : text | phone | longtext | select | currency | day | done
+ *   type       : text | phone | longtext | select | currency | month | day | done
  *                (done → hanya dua pilihan: done / belum)
  *   size       : 'full' = selebar 2 kolom, 'half' = setengah baris
  *   required   : wajib diisi
@@ -37,7 +37,7 @@ const PELANGGAN_FIELDS = [
   { key: 'tagihan',       label: 'Tagihan',            type: 'select', options: OPTIONS.tagihan,       size: 'half', def: 'no' },
   { key: 'kelompok',      label: 'Kelompok',          type: 'select', options: OPTIONS.kelompok,      size: 'half', def: 'pelanggan lancar' },
   { key: 'jumlahTagihan', label: 'Jumlah Tagihan',    type: 'currency', size: 'half', def: 0 },
-  { key: 'jatuhTempo',    label: 'Jatuh Tempo (tgl)', type: 'day',      size: 'half', def: 15, hint: '1–28' },
+  { key: 'bulanTagihan',  label: 'Bulan Tagihan',     type: 'month',    size: 'half', def: '', placeholder: 'Agustus 2026' },
   { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',     size: 'half', def: 'belum' },
   { key: 'reminder1',     label: 'Reminder1', type: 'done', size: 'half', def: 'belum' },
   { key: 'reminder2',     label: 'Reminder2', type: 'done', size: 'half', def: 'belum' },
@@ -193,8 +193,8 @@ async function copyText(text) {
 // Isi template import (di-generate di sisi klien agar selalu bisa diakses, bahkan tanpa unduhan).
 function templateCSV() {
   const rows = [
-    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '15', 'done', 'done', 'belum', 'belum', 'belum'],
-    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '20', 'belum', 'belum', 'belum', 'belum', 'belum'],
+    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '2026-08', 'done', 'done', 'belum', 'belum', 'belum'],
+    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '2026-07', 'belum', 'belum', 'belum', 'belum', 'belum'],
   ];
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
   const lines = [IMPORT_LABELS.join(','), ...rows.map((r) => r.map(csvCell).join(','))];
@@ -811,7 +811,7 @@ async function renderPelanggan(opts = {}) {
 /* ---------- Kolom tabel (dikendalikan PELANGGAN_FIELDS + preferensi user) ---------- */
 const COL_KEY = 'kolektorapp.pelColumns.v1';
 const DEFAULT_ON = ['id', 'nama', 'alamat', 'noHp', 'status', 'infrastruktur', 'tagihan', 'kelompok',
-  'jumlahTagihan', 'jatuhTempo', 'pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'];
+  'jumlahTagihan', 'bulanTagihan', 'pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'];
 
 function visibleColumns() {
   let saved = null;
@@ -872,6 +872,15 @@ function toggleColumnMenu() {
   }, 0);
 }
 
+const BULAN_PENDEK = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+function fmtBulanTagihan(v) {
+  const m = String(v || '').match(/^(\d{4})-(\d{1,2})/);
+  if (!m) return v || '-';
+  const i = Number(m[2]) - 1;
+  if (i < 0 || i > 11) return v;
+  return BULAN_PENDEK[i].toUpperCase() + ' ' + m[1];
+}
+
 function renderCell(f, p) {
   const v = p[f.key];
   switch (f.key) {
@@ -882,7 +891,7 @@ function renderCell(f, p) {
     case 'tagihan': return tagihanBadge(v);
     case 'kelompok': return kelompokBadge(v);
     case 'jumlahTagihan': return `<strong>${fmtRp(v)}</strong>`;
-    case 'jatuhTempo': return v ? `<strong>tgl ${esc(v)}</strong>` : '-';
+    case 'bulanTagihan': return v ? `<strong>${esc(fmtBulanTagihan(v))}</strong>` : '-';
     default:
       if (f.type === 'done') {
         const isDone = v === 'done';
@@ -996,6 +1005,12 @@ function renderFormField(f, p, isAdmin) {
     case 'day':
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
         <input class="${cls}" id="${id}" type="number" min="1" max="28" value="${esc(val)}" /></div>`;
+    case 'month':
+      return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
+        <input class="${cls}" id="${id}" type="month" value="${esc(String(val).slice(0, 7))}" />
+        <div class="month-row">
+          ${['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((mm) => '').join('')}
+        </div></div>`;
     case 'done': {
       const opts = (f.options || OPTIONS.done);
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
@@ -1141,15 +1156,13 @@ async function deletePelanggan(id) {
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 // Template pengumuman tagihan bulanan: bulan pemakaian = bulan lalu, masa bayar = bulan ini (1 s/d 10).
-function tagihanBulananTemplate(p) {
-  // jatuh tempo mengikuti data pelanggan (fallback: tanggal 10)
-  const jtw = (p && p.jatuhTempo) ? Number(p.jatuhTempo) : 10;
+function tagihanBulananTemplate() {
   const now = new Date();
   const tahun = now.getFullYear();
   const bulanIni = BULAN_ID[now.getMonth()];
   const bulanLalu = BULAN_ID[(now.getMonth() + 11) % 12];
   return [
-    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal ${jtw} ${bulanIni.toUpperCase()} ${tahun}`,
+    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal 10 ${bulanIni.toUpperCase()} ${tahun}`,
     '',
     'Pembayaran ke kantor buka setiap hari senin-sabtu pada jam kerja (08:00-17:00).',
     'BAYAR KE KANTOR AKAN DIKENAKAN BIAYA ADMIN 5000',
@@ -1166,7 +1179,7 @@ function openMessageModal(id) {
   const templates = [
     { label: 'Konfirmasi Tagihan', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait tagihan internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
     { label: 'Cek Kendala Layanan', text: `Halo Bpk/Ibu ${p.nama}, ini dari tim kolektor. Apakah ada kendala pada layanan internet Anda? Silakan balas pesan ini. Terima kasih.` },
-    { label: 'Pengumuman Tagihan Bulanan', text: tagihanBulananTemplate(p) },
+    { label: 'Pengumuman Tagihan Bulanan', text: tagihanBulananTemplate() },
   ];
   openModal(`
     <div class="modal-head"><h3>💬 Kirim Pesan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
@@ -1177,7 +1190,7 @@ function openMessageModal(id) {
         <li><span class="dim">No HP / WA</span><strong>${esc(p.noHp)}</strong></li>
         ${p.alamat ? `<li><span class="dim">Alamat</span><span>${esc(p.alamat)}</span></li>` : ''}
         <li><span class="dim">Kelompok</span>${kelompokBadge(p.kelompok)}</li>
-        <li><span class="dim">Jatuh Tempo</span><span>tanggal ${esc(p.jatuhTempo || 10)} tiap bulan</span></li>
+        <li><span class="dim">Bulan Tagihan</span><span>${esc(fmtBulanTagihan(p.bulanTagihan))}</span></li>
       </div>
       <div class="field"><label>Pesan</label>
         <textarea class="input" id="msg-teks" rows="8" placeholder="Tulis pesan untuk pelanggan…">${esc(templates[0].text)}</textarea></div>

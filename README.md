@@ -29,7 +29,7 @@ Form input **rata/flat** dengan urutan persis seperti template import — tidak 
 | 7 | Tagihan | `yes` · `no` · `free` |
 | 8 | Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
 | 9 | Jumlah Tagihan | angka — diketik biasa, tampil otomatis `150.000` |
-| 10 | Jatuh Tempo (tgl) | angka 1–28 (tanggal tagihan tiap bulan) |
+| 10 | Bulan Tagihan | bulan + tahun — pilih `Agustus 2026` (input bulan), tersimpan `YYYY-MM` |
 | 11 | Pengiriman inv | **`done`** / **`belum`** |
 | 12 | Reminder1 | **`done`** / **`belum`** |
 | 13 | Reminder2 | **`done`** / **`belum`** |
@@ -38,6 +38,7 @@ Form input **rata/flat** dengan urutan persis seperti template import — tidak 
 
 > Kolom ke-11 s/d 15 hanya punya dua nilai. Saat import, nilai apa pun yang berarti selesai
 > (`done`, `selesai`, `sudah`, `ya`, `1`, `ok`, `sent`) dibaca sebagai `done`; sisanya `belum`.
+Bulan Tagihan juga menerima tulisan bebas: `Agustus 2026`, `agu 26`, `8/2026`, `2026-08` → disimpan `2026-08`.
 
 **Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk
 menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import ·
@@ -49,7 +50,7 @@ Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
   — header template CSV (`IMPORT_LABELS`) mengikuti array ini secara otomatis
 - `server.js` → `PELANGGAN_FIELDS` (label, tipe, `aliases` untuk pencocokan kolom import, `def`)
 
-Tipe tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `day` · `done` · `number`.
+Tipe tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `month` · `day` · `done` · `number`.
 
 > ⚠️ Menghapus field dari `server.js` menghentikan perawatannya; data lama field itu tetap
 > ada di `data/db.json` tetapi tidak ditampilkan lagi dan akan tertimpa nilai default saat
