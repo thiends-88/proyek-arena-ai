@@ -57,7 +57,9 @@ const state = {
   charts: {},
   pelanggan: [],
   kolektor: [],
-  pelFilter: { search: '', kolektorId: 'all', page: 1 },
+  months: [],
+  dashboardMonth: 'ALL',
+  pelFilter: { search: '', kolektorId: 'all', bulan: 'ALL', page: 1 },
   pageSize: 15,
 };
 
@@ -139,6 +141,30 @@ async function api(path, opts = {}) {
     throw err;
   }
   return data;
+}
+
+function recordId(p) {
+  return p && (p.recordId || p.id);
+}
+
+function currentMonthValue() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+async function loadMonths(kolektorId) {
+  let path = '/api/bulan';
+  if (state.user && state.user.role === 'admin' && kolektorId && kolektorId !== 'all') {
+    path += '?kolektorId=' + enc(kolektorId);
+  }
+  const data = await api(path);
+  state.months = data.bulan || [];
+  return state.months;
+}
+
+function monthOptions(selected = 'ALL', includeAll = true) {
+  const all = includeAll ? `<option value="ALL" ${selected === 'ALL' ? 'selected' : ''}>Semua Bulan</option>` : '';
+  return all + state.months.map((m) => `<option value="${esc(m.value)}" ${selected === m.value ? 'selected' : ''}>${esc(m.label)} (${m.jumlah})</option>`).join('');
 }
 
 // Ambil file sebagai blob (dengan auth token).
@@ -509,7 +535,10 @@ async function renderDashboard() {
   const c = $('#content');
   c.innerHTML = `<div class="empty"><span class="spin">⏳</span> Memuat dashboard…</div>`;
   let d;
-  try { d = await api('/api/dashboard'); } catch (e) { c.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message)}</div>`; return; }
+  try {
+    await loadMonths();
+    d = await api('/api/dashboard?bulan=' + enc(state.dashboardMonth));
+  } catch (e) { c.innerHTML = `<div class="empty"><div class="big">⚠️</div>${esc(e.message)}</div>`; return; }
 
   const isAdmin = state.user.role === 'admin';
   if (isAdmin && !state.kolektor.length) {
@@ -534,6 +563,11 @@ async function renderDashboard() {
       ];
 
   c.innerHTML = `
+    <div class="toolbar card card-pad" style="margin-bottom:18px">
+      <div><strong>Periode Data</strong><div class="card-sub">Pilih bulan untuk dashboard dan ringkasan kolektor</div></div>
+      <div class="grow"></div>
+      <select class="input toolbar-select" id="dashboard-month" onchange="setDashboardMonth(this.value)">${monthOptions(state.dashboardMonth)}</select>
+    </div>
     <div class="grid kpi-grid">
       ${kpis.map((k) => `
         <div class="card kpi ${k.tone}">
@@ -593,7 +627,7 @@ async function renderDashboard() {
           <td class="num" data-label="Total Tagihan"><strong>${fmtRp(k.totalTagihan)}</strong></td>
           <td class="cell-actions"><div class="row-actions">
             <button class="btn btn-ghost btn-sm" onclick="openImportModal('${k.kolektorId}')">⬆️ Import</button>
-            <button class="btn btn-accent btn-sm" onclick="exportPDF('${k.kolektorId}')">📄 Export PDF</button>
+            <button class="btn btn-accent btn-sm" onclick="exportPDF('${k.kolektorId}', '${jsAttr(state.dashboardMonth)}')">📄 Export PDF</button>
             <button class="btn btn-outline btn-sm" onclick="go('pelanggan', {kolektorId:'${k.kolektorId}'})">📋 Data</button>
           </div></td>
         </tr>`).join('')}
@@ -609,6 +643,11 @@ async function renderDashboard() {
   if (isAdmin) {
     renderChart('ch-perkolektor', bar(d.perKolektor.map((x) => x.nama), d.perKolektor.map((x) => x.totalTagihan), PALETTE));
   }
+}
+
+function setDashboardMonth(value) {
+  state.dashboardMonth = value || 'ALL';
+  renderDashboard();
 }
 
 /* ---------- Kolektor (admin) ---------- */
@@ -682,11 +721,14 @@ async function deleteKolektor(id) {
   try { await api('/api/kolektor/' + id, { method: 'DELETE' }); toast('Kolektor dihapus.'); renderKolektor(); } catch (e) { toast(e.message, 'error'); }
 }
 
-async function exportPDF(id) {
+async function exportPDF(id, month = 'ALL') {
   const k = state.kolektor.find((x) => x.id === id);
   const uname = k ? k.username : id;
-  const fname = 'laporan-' + uname + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
-  const htmlUrl = authedUrl('/api/export/' + id + '/html');
+  const selectedMonth = month || 'ALL';
+  const suffix = selectedMonth !== 'ALL' ? '-' + selectedMonth : '-semua-bulan';
+  const fname = 'laporan-' + uname + suffix + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+  const query = '?bulan=' + enc(selectedMonth);
+  const htmlUrl = authedUrl('/api/export/' + id + '/html' + query);
 
   openModal(`
     <div class="modal-head"><h3>📄 Laporan Data Pelanggan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
@@ -715,7 +757,7 @@ async function exportPDF(id) {
 
   $('#rep-download').addEventListener('click', async () => {
     try {
-      const blob = await fetchBlob('/api/export/' + id + '/pdf');
+      const blob = await fetchBlob('/api/export/' + id + '/pdf' + query);
       saveBlob(blob, fname);
       toast('Mengunduh ' + fname + '… Jika tidak muncul, gunakan "Print / Simpan PDF".');
     } catch (e) { toast(e.message, 'error'); }
@@ -734,11 +776,14 @@ async function openImportModal(preselectId) {
       <div id="imp-error" class="form-error hidden"></div>
       <div class="field" style="margin-bottom:14px"><label>Kolektor Tujuan <span class="req">*</span></label>
         <select class="input" id="imp-kolektor">${opts}</select></div>
+      <div class="field" style="margin-bottom:14px"><label>Bulan Default <span class="req">*</span></label>
+        <input class="input" type="month" id="imp-bulan" value="${state.pelFilter.bulan !== 'ALL' ? esc(state.pelFilter.bulan) : currentMonthValue()}" />
+        <div class="fld-hint">Dipakai untuk baris yang kolom Bulan Tagihan-nya kosong.</div></div>
       <div class="field" style="margin-bottom:6px"><label>File (CSV / XLSX) <span class="req">*</span></label>
         <input class="input" type="file" id="imp-file" accept=".csv,.xlsx,.xls" /></div>
       <div class="hint" style="margin-bottom:12px">
         Kolom: <code>${IMPORT_LABELS.join(', ')}</code>.
-        <strong>ID mengikuti data Anda</strong> (wajib diisi &amp; unik). <a href="#" onclick="event.preventDefault();downloadTemplate()">Unduh template CSV</a>.
+        <strong>ID mengikuti data Anda</strong> (wajib diisi). ID yang sama boleh dipakai lagi pada bulan berbeda. <a href="#" onclick="event.preventDefault();downloadTemplate()">Unduh template CSV</a>.
       </div>
       <div id="imp-result"></div>
     </div>
@@ -754,6 +799,7 @@ async function openImportModal(preselectId) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('kolektorId', $('#imp-kolektor').value);
+    fd.append('defaultBulan', $('#imp-bulan').value);
     const btn = $('#imp-run');
     btn.disabled = true; btn.textContent = 'Mengimpor…';
     try {
@@ -774,20 +820,23 @@ async function openExportModal() {
   if (!state.kolektor.length) {
     try { state.kolektor = (await api('/api/kolektor')).kolektor; } catch (e) { toast(e.message, 'error'); return; }
   }
+  try { await loadMonths(); } catch (e) { toast(e.message, 'error'); return; }
   const opts = state.kolektor.map((k) => `<option value="${k.id}">${esc(k.name)} (${esc(k.username)})</option>`).join('');
   openModal(`
     <div class="modal-head"><h3>📄 Export PDF Laporan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
       <div class="field"><label>Pilih Kolektor</label>
         <select class="input" id="exp-kolektor">${opts}</select></div>
-      <div class="hint" style="margin-top:12px">Laporan berisi ringkasan statistik + tabel lengkap data pelanggan kolektor terpilih.</div>
+      <div class="field" style="margin-top:12px"><label>Periode</label>
+        <select class="input" id="exp-bulan">${monthOptions(state.dashboardMonth)}</select></div>
+      <div class="hint" style="margin-top:12px">Laporan berisi ringkasan statistik + tabel lengkap data pelanggan kolektor terpilih sesuai periode.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-accent" id="exp-run">📄 Download PDF</button>
     </div>`);
   $('#exp-run').addEventListener('click', () => {
-    exportPDF($('#exp-kolektor').value);
+    exportPDF($('#exp-kolektor').value, $('#exp-bulan').value);
     closeModal();
   });
 }
@@ -798,7 +847,13 @@ async function renderPelanggan(opts = {}) {
   const c = $('#content');
   c.innerHTML = `<div class="empty"><span class="spin">⏳</span> Memuat data pelanggan…</div>`;
   let list;
-  try { list = (await api('/api/pelanggan')).pelanggan; } catch (e) { c.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try {
+    await loadMonths(state.pelFilter.kolektorId);
+    if (state.pelFilter.bulan !== 'ALL' && !state.months.some((m) => m.value === state.pelFilter.bulan)) state.pelFilter.bulan = 'ALL';
+    let path = '/api/pelanggan?bulan=' + enc(state.pelFilter.bulan || 'ALL');
+    if (state.user.role === 'admin' && state.pelFilter.kolektorId !== 'all') path += '&kolektorId=' + enc(state.pelFilter.kolektorId);
+    list = (await api(path)).pelanggan;
+  } catch (e) { c.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   state.pelanggan = list;
 
   if (state.user.role === 'admin' && !state.kolektor.length) {
@@ -897,7 +952,7 @@ function renderCell(f, p) {
         const isDone = v === 'done';
         const inner = isDone ? '<span class="badge b-done">✓ done</span>' : '<span class="badge b-todo">belum</span>';
         return isDone ? inner
-          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(p.id)}','${f.key}')">${inner}</span>`;
+          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(recordId(p))}','${f.key}')">${inner}</span>`;
       }
       return v ? esc(v) : '-';
   }
@@ -924,6 +979,7 @@ function renderPelangganTable() {
       <option value="all">Semua Kolektor</option>
       ${state.kolektor.map((k) => `<option value="${k.id}" ${f.kolektorId === k.id ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}
     </select>` : '';
+  const monthFilter = `<select class="input toolbar-select" id="pel-filter-bulan" onchange="setPelFilter('bulan', this.value)">${monthOptions(f.bulan)}</select>`;
 
   const cols = visibleColumns().filter((x) => x.on).map((x) => x.f);
   const head = cols.map((f2) => `<th${f2.type === 'currency' ? ' class="num"' : ''}>${esc(f2.label)}</th>`).join('')
@@ -932,15 +988,16 @@ function renderPelangganTable() {
     ${cols.map((f2) => `<td${f2.type === 'currency' ? ' class="num"' : ''} data-label="${esc(f2.label)}">${renderCell(f2, p)}</td>`).join('')}
     ${isAdmin ? `<td data-label="Kolektor">${esc(p.kolektorNama || '-')}</td>` : ''}
     <td class="cell-actions"><div class="row-actions">
-      <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${jsAttr(p.id)}')">✏️<span class="show-sm"> Edit</span></button>
-      <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${jsAttr(p.id)}')">💬<span class="show-sm"> Pesan</span></button>
-      <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${jsAttr(p.id)}')">🗑️<span class="show-sm"> Hapus</span></button>
+      <button class="btn btn-outline btn-sm" title="Edit" onclick="openPelangganModal('${jsAttr(recordId(p))}')">✏️<span class="show-sm"> Edit</span></button>
+      <button class="btn btn-accent btn-sm" title="Kirim Pesan" onclick="openMessageModal('${jsAttr(recordId(p))}')">💬<span class="show-sm"> Pesan</span></button>
+      <button class="btn btn-danger btn-sm" title="Hapus" onclick="deletePelanggan('${jsAttr(recordId(p))}')">🗑️<span class="show-sm"> Hapus</span></button>
     </div></td>
   </tr>`).join('') : `<tr><td colspan="${cols.length + (isAdmin ? 2 : 1)}" class="empty"><div class="big">📭</div>Belum ada data pelanggan.</td></tr>`;
 
   c.innerHTML = `
     <div class="toolbar">
       ${kolektorFilter}
+      ${monthFilter}
       <div class="search-box"><input type="text" id="pel-search" placeholder="Cari nama / no HP / ID / alamat…" value="${esc(f.search)}" oninput="setPelFilter('search', this.value)" /></div>
       <button class="btn btn-outline btn-sm" id="pel-col-btn" onclick="toggleColumnMenu()">⚙️ Kolom</button>
       <div class="grow"></div>
@@ -958,9 +1015,10 @@ function renderPelangganTable() {
       <button onclick="setPelFilter('page', ${f.page + 1})" ${f.page >= pages ? 'disabled' : ''}>›</button>
     </div>`;
 }
-function setPelFilter(key, value) {
+async function setPelFilter(key, value) {
   if (key === 'search') state.pelFilter.search = value;
-  if (key === 'kolektorId') { state.pelFilter.kolektorId = value; state.pelFilter.page = 1; }
+  if (key === 'kolektorId') { state.pelFilter.kolektorId = value; state.pelFilter.page = 1; await renderPelanggan(); return; }
+  if (key === 'bulan') { state.pelFilter.bulan = value || 'ALL'; state.pelFilter.page = 1; await renderPelanggan(); return; }
   if (key === 'page') state.pelFilter.page = Number(value) || 1;
   renderPelangganTable();
   if (key === 'search') {
@@ -989,7 +1047,7 @@ function renderFormField(f, p, isAdmin) {
     return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}<select class="${cls}" id="${id}">${opts}</select></div>`;
   }
 
-  const val = p && p[f.key] !== undefined && p[f.key] !== null ? p[f.key] : (f.def === undefined ? '' : f.def);
+  const val = p && p[f.key] !== undefined && p[f.key] !== null ? p[f.key] : (f.key === 'bulanTagihan' && state.pelFilter.bulan !== 'ALL' ? state.pelFilter.bulan : (f.def === undefined ? '' : f.def));
   switch (f.type) {
     case 'select': {
       const opts = (f.options || []).map((o) => `<option value="${esc(o)}" ${String(o) === String(val) ? 'selected' : ''}>${esc(o)}</option>`).join('');
@@ -1069,7 +1127,7 @@ function validateFormClient(isAdmin) {
 }
 
 function openPelangganModal(id) {
-  const p = id ? state.pelanggan.find((x) => x.id === id) : null;
+  const p = id ? state.pelanggan.find((x) => recordId(x) === id || x.id === id) : null;
   const isAdmin = state.user.role === 'admin';
   const title = p ? 'Edit Pelanggan' : 'Tambah Pelanggan';
 
@@ -1120,7 +1178,7 @@ function openPelangganModal(id) {
     const payload = collectFormPayload(isAdmin);
     if (!p) payload.id = (document.getElementById(fieldInput('id')) || {}).value || '';
     try {
-      if (p) await api('/api/pelanggan/' + enc(p.id), { method: 'PUT', body: JSON.stringify(payload) });
+      if (p) await api('/api/pelanggan/' + enc(recordId(p)), { method: 'PUT', body: JSON.stringify(payload) });
       else await api('/api/pelanggan', { method: 'POST', body: JSON.stringify(payload) });
       closeModal(); toast(p ? 'Data pelanggan diperbarui.' : 'Pelanggan ditambahkan.');
       renderPelanggan();
@@ -1130,14 +1188,14 @@ function openPelangganModal(id) {
 
 // Toggle cepat done ↔ belum langsung dari tabel (PUT menimpa semua field, jadi kirim utuh)
 async function toggleDoneField(id, key) {
-  const p = state.pelanggan.find((x) => x.id === id);
+  const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
   if (!p) return;
   const payload = {};
   PELANGGAN_FIELDS.forEach((f) => { if (f.key !== 'id') payload[f.key] = p[f.key]; });
   payload[key] = p[key] === 'done' ? 'belum' : 'done';
   if (state.user.role === 'admin' && p.kolektorId) payload.kolektorId = p.kolektorId;
   try {
-    await api('/api/pelanggan/' + enc(id), { method: 'PUT', body: JSON.stringify(payload) });
+    await api('/api/pelanggan/' + enc(recordId(p)), { method: 'PUT', body: JSON.stringify(payload) });
     await renderPelanggan();
     toast(fLabel(key) + ': ' + (payload[key] === 'done' ? 'done ✓' : 'belum'));
   } catch (e) { toast(e.message, 'error'); }
@@ -1146,9 +1204,11 @@ async function toggleDoneField(id, key) {
 const fLabel = (key) => (PELANGGAN_FIELDS.find((f) => f.key === key) || {}).label || key;
 
 async function deletePelanggan(id) {
+  const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
+  if (!p) return;
   const ok = await confirmDialog('Hapus Pelanggan', 'Yakin hapus data pelanggan ini? Tindakan tidak bisa dibatalkan.');
   if (!ok) return;
-  try { await api('/api/pelanggan/' + enc(id), { method: 'DELETE' }); toast('Pelanggan dihapus.'); renderPelanggan(); } catch (e) { toast(e.message, 'error'); }
+  try { await api('/api/pelanggan/' + enc(recordId(p)), { method: 'DELETE' }); toast('Pelanggan dihapus.'); renderPelanggan(); } catch (e) { toast(e.message, 'error'); }
 }
 
 /* ---------- Kirim Pesan (WhatsApp) ---------- */
@@ -1174,7 +1234,7 @@ function tagihanBulananTemplate() {
 }
 
 function openMessageModal(id) {
-  const p = state.pelanggan.find((x) => x.id === id);
+  const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
   if (!p) return;
   const templates = [
     { label: 'Konfirmasi Tagihan', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait tagihan internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
@@ -1212,7 +1272,7 @@ function openMessageModal(id) {
     errEl.classList.add('hidden');
     if (!teks) { errEl.textContent = 'Pesan tidak boleh kosong.'; errEl.classList.remove('hidden'); return; }
     try {
-      const r = await api('/api/pelanggan/' + enc(p.id) + '/message', { method: 'POST', body: JSON.stringify({ teks }) });
+      const r = await api('/api/pelanggan/' + enc(recordId(p)) + '/message', { method: 'POST', body: JSON.stringify({ teks }) });
       closeModal();
       toast('Pesan tercatat. Membuka WhatsApp…');
       window.open(r.wa, '_blank');
