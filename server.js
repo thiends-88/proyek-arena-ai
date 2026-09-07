@@ -94,6 +94,22 @@ function saveDB(db) {
 
 let db = loadDB();
 
+// Setiap baris pelanggan adalah snapshot untuk satu bulan. recordId internal
+// membedakan snapshot dengan ID pelanggan yang sama pada bulan berbeda, tanpa
+// menambah atau mengubah 15 kolom yang tampil di aplikasi.
+function ensureRecordIds(list) {
+  const used = new Set();
+  (list || []).forEach((p) => {
+    const base = p.recordId || `rec-${p.id || 'pelanggan'}-${p.bulanTagihan || 'tanpa-bulan'}`;
+    let key = base;
+    let n = 2;
+    while (used.has(key)) key = `${base}-${n++}`;
+    p.recordId = key;
+    used.add(key);
+  });
+}
+ensureRecordIds(db.pelanggan);
+
 // ---------------------------------------------------------------------------
 // Util
 // ---------------------------------------------------------------------------
@@ -512,7 +528,7 @@ app.get('/api/me', (req, res) => {
 // --- Kolektor (admin) ---
 app.get('/api/kolektor', requireAuth, requireAdmin, (req, res) => {
   const list = db.users.filter((u) => u.role === 'kolektor').map((u) => {
-    const pl = db.pelanggan.filter((p) => p.kolektorId === u.id);
+    const pl = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === u.id), req.query.bulan);
     return {
       ...publicUser(u),
       jumlahPelanggan: pl.length,
@@ -566,15 +582,58 @@ function scopedPelanggan(user) {
   return db.pelanggan.filter((p) => p.kolektorId === user.id);
 }
 
-app.get('/api/pelanggan', requireAuth, (req, res) => {
+function requestedMonth(value) {
+  if (!value || String(value).toUpperCase() === 'ALL') return '';
+  return normMonth(value);
+}
+
+function filterByMonth(list, value) {
+  const month = requestedMonth(value);
+  return month ? list.filter((p) => p.bulanTagihan === month) : list;
+}
+
+function recordKey(p) {
+  return p.recordId || p.id;
+}
+
+function findPelangganRecord(id) {
+  const key = String(id || '');
+  return db.pelanggan.find((p) => recordKey(p) === key) || db.pelanggan.find((p) => p.id === key);
+}
+
+function duplicateMonthlyRecord(id, month, except) {
+  return db.pelanggan.some((p) => p !== except && p.id === id && p.bulanTagihan === month);
+}
+
+// GET /api/bulan mengembalikan periode yang tersedia beserta jumlah datanya.
+app.get('/api/bulan', requireAuth, (req, res) => {
   let list = scopedPelanggan(req.user);
+  if (req.user.role === 'admin' && req.query.kolektorId) {
+    list = list.filter((p) => p.kolektorId === req.query.kolektorId);
+  }
+  const grouped = new Map();
+  list.forEach((p) => {
+    const value = p.bulanTagihan || '';
+    const row = grouped.get(value) || { value, jumlah: 0, totalTagihan: 0 };
+    row.jumlah += 1;
+    row.totalTagihan += Number(p.jumlahTagihan || 0);
+    grouped.set(value, row);
+  });
+  const bulan = Array.from(grouped.values())
+    .sort((a, b) => String(b.value).localeCompare(String(a.value)))
+    .map((row) => ({ ...row, label: row.value ? fmtMonthID(row.value) : 'Tanpa Bulan' }));
+  res.json({ bulan, total: list.length });
+});
+
+app.get('/api/pelanggan', requireAuth, (req, res) => {
+  let list = filterByMonth(scopedPelanggan(req.user), req.query.bulan);
   const { kolektorId } = req.query;
   if (req.user.role === 'admin' && kolektorId) {
     list = list.filter((p) => p.kolektorId === kolektorId);
   }
   const kolektorNames = {};
   db.users.forEach((u) => { kolektorNames[u.id] = u.name; });
-  res.json({ pelanggan: list.map((p) => ({ ...p, kolektorNama: kolektorNames[p.kolektorId] || '-' })) });
+  res.json({ pelanggan: list.map((p) => ({ ...p, recordId: recordKey(p), kolektorNama: kolektorNames[p.kolektorId] || '-' })) });
 });
 
 // Validasi berbasis PELANGGAN_FIELDS — label wajib & tipe diambil dari konfigurasi,
@@ -642,59 +701,62 @@ app.post('/api/pelanggan', requireAuth, (req, res) => {
   // ID: gunakan ID dari input bila diisi & unik; jika kosong, buat otomatis.
   let id = String(req.body.id || '').trim();
   if (id) {
-    if (db.pelanggan.some((p) => p.id === id)) {
-      return res.status(400).json({ error: 'ID "' + id + '" sudah digunakan. Gunakan ID lain.' });
+    if (duplicateMonthlyRecord(id, v.data.bulanTagihan, null)) {
+      return res.status(400).json({ error: 'ID tersebut sudah ada pada bulan tagihan yang sama.' });
     }
   } else {
     db.meta.seqPelanggan += 1;
     id = 'PLG-' + String(db.meta.seqPelanggan).padStart(4, '0');
   }
-  const pelanggan = { id, kolektorId, ...v.data, createdAt: new Date().toISOString() };
+  const pelanggan = { recordId: uid('rec'), id, kolektorId, ...v.data, createdAt: new Date().toISOString() };
   db.pelanggan.push(pelanggan);
   saveDB(db);
   res.json({ pelanggan });
 });
 
 app.put('/api/pelanggan/:id', requireAuth, (req, res) => {
-  const p = db.pelanggan.find((x) => x.id === req.params.id);
+  const p = findPelangganRecord(req.params.id);
   if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
   const v = validatePelanggan(req.body || {});
   if (v.error) return res.status(400).json({ error: v.error });
+  if (duplicateMonthlyRecord(p.id, v.data.bulanTagihan, p)) {
+    return res.status(400).json({ error: 'ID tersebut sudah ada pada bulan tagihan yang sama.' });
+  }
   Object.assign(p, v.data);
   if (req.user.role === 'admin' && req.body.kolektorId) {
     const k = db.users.find((u) => u.id === req.body.kolektorId && u.role === 'kolektor');
     if (k) p.kolektorId = k.id;
   }
   saveDB(db);
-  res.json({ pelanggan: p });
+  res.json({ pelanggan: { ...p, recordId: recordKey(p) } });
 });
 
 app.delete('/api/pelanggan/:id', requireAuth, (req, res) => {
-  const idx = db.pelanggan.findIndex((x) => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
-  const p = db.pelanggan[idx];
+  const p = findPelangganRecord(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
-  db.pelanggan.splice(idx, 1);
-  db.pesan = db.pesan.filter((m) => m.pelangganId !== p.id);
+  db.pelanggan = db.pelanggan.filter((row) => row !== p);
+  const keys = new Set([p.id, recordKey(p)]);
+  db.pesan = db.pesan.filter((m) => !keys.has(m.pelangganId));
   saveDB(db);
   res.json({ ok: true });
 });
 
 // --- Pesan (WhatsApp) ---
 app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
-  const p = db.pelanggan.find((x) => x.id === req.params.id);
+  const p = findPelangganRecord(req.params.id);
   if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
   const teks = String(req.body.teks || '').trim();
   if (!teks) return res.status(400).json({ error: 'Pesan tidak boleh kosong.' });
-  const msg = { id: uid('msg'), pelangganId: p.id, kolektorId: req.user.id, teks, waktu: new Date().toISOString() };
+  const msg = { id: uid('msg'), pelangganId: recordKey(p), kolektorId: req.user.id, teks, waktu: new Date().toISOString() };
   db.pesan.push(msg);
   saveDB(db);
   res.json({ ok: true, wa: waLink(p.noHp, teks) });
@@ -703,7 +765,7 @@ app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
 app.get('/api/pesan', requireAuth, (req, res) => {
   let list = req.user.role === 'admin' ? db.pesan : db.pesan.filter((m) => m.kolektorId === req.user.id);
   const names = {};
-  db.pelanggan.forEach((p) => { names[p.id] = p.nama; });
+  db.pelanggan.forEach((p) => { names[p.id] = p.nama; names[recordKey(p)] = p.nama; });
   const users = {};
   db.users.forEach((u) => { users[u.id] = u.name; });
   list = list
@@ -811,6 +873,7 @@ function keepTextNumbers(ws, rows) {
 app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan.' });
   const kolektorId = req.body.kolektorId;
+  const defaultBulan = normMonth(req.body.defaultBulan);
   const k = db.users.find((u) => u.id === kolektorId && u.role === 'kolektor');
   if (!k) return res.status(400).json({ error: 'Pilih kolektor tujuan terlebih dahulu.' });
 
@@ -858,17 +921,20 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
       errors.push(`Baris ${i + 2}: ID kosong — baris dilewati (ID harus diisi sesuai data Anda).`);
       return;
     }
-    if (db.pelanggan.some((p) => p.id === id) || importedIds.has(id)) {
-      errors.push(`Baris ${i + 2}: ID "${id}" sudah ada / duplikat — baris dilewati.`);
-      return;
-    }
-    importedIds.add(id);
+    // Bila kolom Bulan Tagihan kosong, gunakan periode yang dipilih di dialog import.
+    if (!mapped.bulanTagihan && defaultBulan) mapped.bulanTagihan = defaultBulan;
 
     // Validasi + normalisasi memakai aturan yang sama dengan form input
     const v = validatePelanggan(mapped);
     if (v.error) { errors.push(`Baris ${i + 2}: ${v.error}`); return; }
+    const monthlyKey = id + '::' + (v.data.bulanTagihan || 'tanpa-bulan');
+    if (duplicateMonthlyRecord(id, v.data.bulanTagihan, null) || importedIds.has(monthlyKey)) {
+      errors.push(`Baris ${i + 2}: ID "${id}" sudah ada pada bulan yang sama / duplikat — baris dilewati.`);
+      return;
+    }
+    importedIds.add(monthlyKey);
 
-    db.pelanggan.push({ id, kolektorId: k.id, ...v.data, createdAt: new Date().toISOString() });
+    db.pelanggan.push({ recordId: uid('rec'), id, kolektorId: k.id, ...v.data, createdAt: new Date().toISOString() });
     imported.push({ id, nama, noHp });
   });
 
@@ -936,12 +1002,14 @@ function aggregate(list) {
 }
 
 app.get('/api/dashboard', requireAuth, (req, res) => {
-  const list = scopedPelanggan(req.user);
+  const month = requestedMonth(req.query.bulan);
+  const list = filterByMonth(scopedPelanggan(req.user), month);
   const data = aggregate(list);
+  data.bulan = month || 'ALL';
   if (req.user.role === 'admin') {
     data.totalKolektor = db.users.filter((u) => u.role === 'kolektor').length;
     data.perKolektor = db.users.filter((u) => u.role === 'kolektor').map((u) => {
-      const pl = db.pelanggan.filter((p) => p.kolektorId === u.id);
+      const pl = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === u.id), month);
       const a = aggregate(pl);
       return { kolektorId: u.id, nama: u.name, username: u.username, ...a };
     });
@@ -949,7 +1017,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     data.perKolektor = [];
   }
   const names = {};
-  db.pelanggan.forEach((p) => { names[p.id] = p.nama; });
+  db.pelanggan.forEach((p) => { names[p.id] = p.nama; names[recordKey(p)] = p.nama; });
   const users = {};
   db.users.forEach((u) => { users[u.id] = u.name; });
   data.recentPesan = db.pesan
@@ -965,9 +1033,11 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
 app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) => {
   const k = db.users.find((u) => u.id === req.params.kolektorId && u.role === 'kolektor');
   if (!k) return res.status(404).json({ error: 'Kolektor tidak ditemukan.' });
-  const pelanggan = db.pelanggan.filter((p) => p.kolektorId === k.id);
+  const month = requestedMonth(req.query.bulan);
+  const pelanggan = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === k.id), month);
   const a = aggregate(pelanggan);
   const today = new Date().toLocaleString('id-ID', { dateStyle: 'long' });
+  const periodLabel = month ? fmtMonthID(month) : 'Semua Bulan';
 
   const rows = pelanggan.map((p, i) => `
     <tr>
@@ -991,7 +1061,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Laporan ${escHtml(k.name)}</title>
+<title>Laporan ${escHtml(k.name)} — ${escHtml(periodLabel)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; background: #fff; }
@@ -1039,6 +1109,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   <div class="meta">
     <span>Nama Kolektor: <b>${escHtml(k.name)}</b></span>
     <span>Username: <b>${escHtml(k.username)}</b></span>
+    <span>Periode: <b>${escHtml(periodLabel)}</b></span>
     <span>Tanggal: <b>${escHtml(today)}</b></span>
   </div>
   <div class="cards">
@@ -1064,10 +1135,12 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
 app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, res) => {
   const k = db.users.find((u) => u.id === req.params.kolektorId && u.role === 'kolektor');
   if (!k) return res.status(404).json({ error: 'Kolektor tidak ditemukan.' });
-  const pelanggan = db.pelanggan.filter((p) => p.kolektorId === k.id);
+  const month = requestedMonth(req.query.bulan);
+  const pelanggan = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === k.id), month);
   try {
-    const buffer = await generateKolektorPDF(k, pelanggan);
-    const fname = 'laporan-' + k.username + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    const buffer = await generateKolektorPDF(k, pelanggan, month);
+    const suffix = month ? '-' + month : '-semua-bulan';
+    const fname = 'laporan-' + k.username + suffix + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
     res.setHeader('Content-Type', 'application/pdf');
     // view=1 → tampilkan inline (untuk dibuka di tab baru), default → unduh
     const disp = req.query.view === '1' ? 'inline' : 'attachment';
@@ -1079,7 +1152,7 @@ app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, re
   }
 });
 
-function generateKolektorPDF(kolektor, pelanggan) {
+function generateKolektorPDF(kolektor, pelanggan, month = '') {
   return new Promise((resolve, reject) => {
     // A4 landscape: kolom laporan bertambah (alamat, produk, kecepatan, tgl pasang,
     // jatuh tempo, catatan) sehingga portrait sudah terlalu sempit.
@@ -1104,6 +1177,7 @@ function generateKolektorPDF(kolektor, pelanggan) {
       .text('Nama Kolektor   : ' + kolektor.name)
       .text('Username        : ' + kolektor.username)
       .text('Tanggal Cetak   : ' + today)
+      .text('Periode         : ' + (month ? fmtMonthID(month) : 'Semua Bulan'))
       .moveDown(0.6);
 
     // Ringkasan
