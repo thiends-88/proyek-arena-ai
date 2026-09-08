@@ -292,6 +292,59 @@ input[type=month].input { min-height: 42px; }
 .badge-click { cursor: pointer; display: inline-block; border-radius: 999px; transition: transform .12s ease, box-shadow .12s ease; }
 .badge-click:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15,118,110,.22); outline: 1px dashed var(--primary); }
 .badge.b-todo { background: #f1f5f9; color: #64748b; }
+/* ---------- Komentar di bawah toggle done/belum ---------- */
+.done-comment-input {
+  margin-top: 6px !important;
+  font-size: 12.5px !important;
+  padding: 7px 10px !important;
+  color: var(--muted);
+  border-style: dashed;
+}
+.done-comment-input:focus {
+  color: var(--ink);
+  border-style: solid;
+}
+.done-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+.done-comment {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: background .12s, color .12s;
+  line-height: 1.4;
+}
+.done-comment:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+.done-comment-add {
+  font-size: 11px;
+  color: #b0b8c4;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, color .12s;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+tr:hover .done-comment-add,
+.done-comment-add:hover {
+  opacity: 1;
+  color: var(--primary);
+}
+.done-comment-add:hover {
+  background: var(--primary-light);
+}
+
 .form-grid { margin-bottom: 4px; }
 .field .fld-hint { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
 .field textarea.input { resize: vertical; min-height: 46px; line-height: 1.45; }
@@ -457,6 +510,12 @@ input[type=month].input { min-height: 42px; }
   table.data.cards td.cell-actions .btn { flex: 1 1 auto; justify-content: center; }
   table.data.cards td.empty { display: block; text-align: center; padding: 40px 16px; }
   table.data.cards .badge { white-space: normal; text-align: left; }
+  table.data.cards .done-cell { flex-direction: column; align-items: flex-end; gap: 4px; }
+  table.data.cards .done-comment {
+    max-width: 100%; white-space: normal; font-size: 12px;
+    text-align: right; opacity: 1;
+  }
+  table.data.cards .done-comment-add { opacity: 1; font-size: 12px; }
 }
 
 /* ---------- ≤ 600px: ringkas teks di topbar ---------- */

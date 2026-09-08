@@ -38,11 +38,16 @@ const PELANGGAN_FIELDS = [
   { key: 'kelompok',      label: 'Kelompok',          type: 'select', options: OPTIONS.kelompok,      size: 'half', def: 'pelanggan lancar' },
   { key: 'jumlahTagihan', label: 'Jumlah Tagihan',    type: 'currency', size: 'half', def: 0 },
   { key: 'bulanTagihan',  label: 'Bulan Tagihan',     type: 'month',    size: 'half', def: '', placeholder: 'Agustus 2026' },
-  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',     size: 'half', def: 'belum' },
-  { key: 'reminder1',     label: 'Reminder1', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder2',     label: 'Reminder2', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder3',     label: 'Reminder3', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder4',     label: 'Reminder4', type: 'done', size: 'half', def: 'belum' },
+  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',     size: 'half', def: 'belum', commentKey: 'pengirimanInvComment' },
+  { key: 'pengirimanInvComment', label: 'Keterangan Pengiriman inv', type: 'text', size: 'full', def: '', table: false, inline: true },
+  { key: 'reminder1',     label: 'Reminder1', type: 'done', size: 'half', def: 'belum', commentKey: 'reminder1Comment' },
+  { key: 'reminder1Comment', label: 'Keterangan Reminder1', type: 'text', size: 'full', def: '', table: false, inline: true },
+  { key: 'reminder2',     label: 'Reminder2', type: 'done', size: 'half', def: 'belum', commentKey: 'reminder2Comment' },
+  { key: 'reminder2Comment', label: 'Keterangan Reminder2', type: 'text', size: 'full', def: '', table: false, inline: true },
+  { key: 'reminder3',     label: 'Reminder3', type: 'done', size: 'half', def: 'belum', commentKey: 'reminder3Comment' },
+  { key: 'reminder3Comment', label: 'Keterangan Reminder3', type: 'text', size: 'full', def: '', table: false, inline: true },
+  { key: 'reminder4',     label: 'Reminder4', type: 'done', size: 'half', def: 'belum', commentKey: 'reminder4Comment' },
+  { key: 'reminder4Comment', label: 'Keterangan Reminder4', type: 'text', size: 'full', def: '', table: false, inline: true },
 ];
 
 // Header template import CSV — diambil otomatis dari urutan di atas
@@ -219,8 +224,8 @@ async function copyText(text) {
 // Isi template import (di-generate di sisi klien agar selalu bisa diakses, bahkan tanpa unduhan).
 function templateCSV() {
   const rows = [
-    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '2026-08', 'done', 'done', 'belum', 'belum', 'belum'],
-    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '2026-07', 'belum', 'belum', 'belum', 'belum', 'belum'],
+    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '2026-08', 'done', 'Sudah dikirim via WA', 'done', 'Reminder via telpon', 'belum', '', 'belum', '', 'belum', ''],
+    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '2026-07', 'belum', '', 'belum', '', 'belum', '', 'belum', '', 'belum', ''],
   ];
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
   const lines = [IMPORT_LABELS.join(','), ...rows.map((r) => r.map(csvCell).join(','))];
@@ -950,9 +955,17 @@ function renderCell(f, p) {
     default:
       if (f.type === 'done') {
         const isDone = v === 'done';
-        const inner = isDone ? '<span class="badge b-done">✓ done</span>' : '<span class="badge b-todo">belum</span>';
-        return isDone ? inner
-          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(recordId(p))}','${f.key}')">${inner}</span>`;
+        const commentKey = f.commentKey || '';
+        const comment = commentKey ? (p[commentKey] || '') : '';
+        const badge = isDone ? '<span class="badge b-done">✓ done</span>' : '<span class="badge b-todo">belum</span>';
+        const badgeHtml = isDone ? badge
+          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(recordId(p))}','${f.key}')">${badge}</span>`;
+        const rid = jsAttr(recordId(p));
+        const fk = f.key;
+        const commentHtml = comment
+          ? `<div class="done-comment" title="${esc(comment)}" onclick="event.stopPropagation();editDoneComment('${rid}','${fk}')">${esc(comment.length > 40 ? comment.slice(0, 40) + '…' : comment)}</div>`
+          : `<div class="done-comment-add" onclick="event.stopPropagation();editDoneComment('${rid}','${fk}')">+ keterangan</div>`;
+        return `<div class="done-cell">${badgeHtml}${commentHtml}</div>`;
       }
       return v ? esc(v) : '-';
   }
@@ -1071,10 +1084,17 @@ function renderFormField(f, p, isAdmin) {
         </div></div>`;
     case 'done': {
       const opts = (f.options || OPTIONS.done);
+      const commentKey = f.commentKey || '';
+      const commentVal = commentKey && p && p[commentKey] ? p[commentKey] : '';
+      const commentId = commentKey ? 'pl-' + commentKey : '';
+      const commentHtml = commentKey
+        ? `<input class="input done-comment-input" id="${commentId}" type="text" value="${esc(commentVal)}" placeholder="Keterangan (opsional)…" maxlength="200" />`
+        : '';
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}
         <div class="seg2" id="${id}" data-val="${esc(val)}">
           ${opts.map((o) => `<button type="button" class="seg2-btn ${String(o) === String(val) ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
-        </div></div>`;
+        </div>
+        ${commentHtml}</div>`;
     }
     default:
       const phoneAttr = f.type === 'phone' ? ' data-phone' : '';
@@ -1087,7 +1107,7 @@ function renderFormField(f, p, isAdmin) {
 // Susunan form: rata/flat, urutan = urutan konfigurasi. Kolektor ditaruh di akhir
 // (khusus admin) agar 16 kolom utama tetap persis seperti template import.
 function renderFormFields(p, isAdmin) {
-  const fields = PELANGGAN_FIELDS.slice();
+  const fields = PELANGGAN_FIELDS.filter((f) => !f.inline).slice();
   if (isAdmin) fields.push({ key: 'kolektorId', label: 'Kolektor', type: 'text', size: 'full', required: false });
   return `<div class="form-grid">${fields.map((f) => renderFormField(f, p, isAdmin)).join('')}</div>`;
 }
@@ -1097,9 +1117,18 @@ function collectFormPayload(isAdmin) {
   const payload = {};
   PELANGGAN_FIELDS.forEach((f) => {
     if (f.key === 'id') return;
+    if (f.inline) return; // komentar ditangani bersama field done induknya
     const el = document.getElementById(fieldInput(f));
     if (!el) return;
-    if (f.type === 'done') { payload[f.key] = el.dataset.val || f.def; return; }
+    if (f.type === 'done') {
+      payload[f.key] = el.dataset.val || f.def;
+      // Ambil juga nilai komentar jika field done memiliki commentKey
+      if (f.commentKey) {
+        const cEl = document.getElementById('pl-' + f.commentKey);
+        if (cEl) payload[f.commentKey] = cEl.value;
+      }
+      return;
+    }
     payload[f.key] = f.type === 'currency' ? String(el.value).replace(/\D/g, '') : el.value;
   });
   if (isAdmin) {
@@ -1202,6 +1231,41 @@ async function toggleDoneField(id, key) {
 }
 
 const fLabel = (key) => (PELANGGAN_FIELDS.find((f) => f.key === key) || {}).label || key;
+
+// Edit keterangan (comment) langsung dari tabel — modal kecil untuk satu field
+async function editDoneComment(id, fieldKey) {
+  const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
+  if (!p) return;
+  const f = PELANGGAN_FIELDS.find((x) => x.key === fieldKey);
+  if (!f || !f.commentKey) return;
+  const currentComment = p[f.commentKey] || '';
+  openModal(`
+    <div class="modal-head"><h3>📝 Keterangan — ${esc(f.label)}</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field full">
+        <label>Keterangan / Alasan</label>
+        <textarea class="input" id="comment-text" rows="3" placeholder="Tulis keterangan atau alasan…" maxlength="200">${esc(currentComment)}</textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" id="comment-save">💾 Simpan</button>
+    </div>`);
+  const ta = $('#comment-text');
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  $('#comment-save').addEventListener('click', async () => {
+    const payload = {};
+    PELANGGAN_FIELDS.forEach((fld) => { if (fld.key !== 'id' && !fld.inline) payload[fld.key] = p[fld.key]; });
+    payload[f.commentKey] = $('#comment-text').value.trim();
+    if (state.user.role === 'admin' && p.kolektorId) payload.kolektorId = p.kolektorId;
+    try {
+      await api('/api/pelanggan/' + enc(recordId(p)), { method: 'PUT', body: JSON.stringify(payload) });
+      closeModal();
+      toast('Keterangan diperbarui.');
+      await renderPelanggan();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
 
 async function deletePelanggan(id) {
   const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);

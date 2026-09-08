@@ -55,10 +55,15 @@ const PELANGGAN_FIELDS = [
   { key: 'jumlahTagihan', label: 'Jumlah Tagihan', type: 'currency', def: 0, aliases: ['jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
   { key: 'bulanTagihan', label: 'Bulan Tagihan', type: 'month', def: '', aliases: ['bulan tagihan', 'bulantagihan', 'bulan', 'periode', 'period', 'tagihan bulan', 'billing month', 'billingmonth'] },
   { key: 'pengirimanInv', label: 'Pengiriman inv', type: 'done', def: 'belum', aliases: ['pengirimaninv', 'kiriminv', 'kirim', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1'] },
+  { key: 'pengirimanInvComment', label: 'Keterangan Pengiriman inv', type: 'text', def: '', aliases: ['keteranganpengirimaninv', 'keteranganinv', 'ketpengirimaninv', 'ketinv'] },
   { key: 'reminder1', label: 'Reminder1', type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
+  { key: 'reminder1Comment', label: 'Keterangan Reminder1', type: 'text', def: '', aliases: ['keteranganreminder1', 'keterangarem1', 'ketreminder1', 'ketrem1'] },
   { key: 'reminder2', label: 'Reminder2', type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
+  { key: 'reminder2Comment', label: 'Keterangan Reminder2', type: 'text', def: '', aliases: ['keteranganreminder2', 'keterangarem2', 'ketreminder2', 'ketrem2'] },
   { key: 'reminder3', label: 'Reminder3', type: 'done', def: 'belum', aliases: ['reminder3', 'reminder 3', 'rem3', 'pengingat3'] },
+  { key: 'reminder3Comment', label: 'Keterangan Reminder3', type: 'text', def: '', aliases: ['keteranganreminder3', 'keterangarem3', 'ketreminder3', 'ketrem3'] },
   { key: 'reminder4', label: 'Reminder4', type: 'done', def: 'belum', aliases: ['reminder4', 'reminder 4', 'rem4', 'pengingat4'] },
+  { key: 'reminder4Comment', label: 'Keterangan Reminder4', type: 'text', def: '', aliases: ['keteranganreminder4', 'keterangarem4', 'ketreminder4', 'ketrem4'] },
 ];
 
 const FIELD_BY_KEY = Object.fromEntries(PELANGGAN_FIELDS.map((f) => [f.key, f]));
@@ -387,6 +392,8 @@ function seedDB() {
       + ' No. ' + (1 + Math.floor(rnd() * 80)) + ', RT ' + String(1 + Math.floor(rnd() * 9)).padStart(2, '0');
     const pengirimanInv = tagihan === 'yes' ? done(0.55) : 'belum';
     const jmlReminder = tagihan === 'yes' ? Math.floor(rnd() * 5) : Math.floor(rnd() * 3);
+    const ketOptions = ['Sudah dikirim via WA', 'Invoice fisik sudah diantar', 'Dikirim via email', 'Belum sempat dikirim', 'Menunggu konfirmasi alamat', ''];
+    const reminderKet = ['Reminder via telpon', 'Sudah diingatkan via WA', 'Belum bisa dihubungi', 'Janji bayar minggu depan', ''];
     pelanggan.push({
       id: 'PLG-' + String(i + 1).padStart(4, '0'),
       kolektorId: kolektor.id,
@@ -400,10 +407,15 @@ function seedDB() {
       jumlahTagihan,
       bulanTagihan: (() => { const d = new Date(); d.setMonth(d.getMonth() - Math.floor(rnd() * 3)); return d.toISOString().slice(0, 7); })(),
       pengirimanInv,
+      pengirimanInvComment: pengirimanInv === 'done' ? ketOptions[Math.floor(rnd() * (ketOptions.length - 1))] : '',
       reminder1: jmlReminder >= 1 ? 'done' : 'belum',
+      reminder1Comment: jmlReminder >= 1 ? reminderKet[Math.floor(rnd() * (reminderKet.length - 1))] : '',
       reminder2: jmlReminder >= 2 ? 'done' : 'belum',
+      reminder2Comment: jmlReminder >= 2 ? reminderKet[Math.floor(rnd() * (reminderKet.length - 1))] : '',
       reminder3: jmlReminder >= 3 ? 'done' : 'belum',
+      reminder3Comment: jmlReminder >= 3 ? reminderKet[Math.floor(rnd() * (reminderKet.length - 1))] : '',
       reminder4: jmlReminder >= 4 ? 'done' : 'belum',
+      reminder4Comment: jmlReminder >= 4 ? reminderKet[Math.floor(rnd() * (reminderKet.length - 1))] : '',
       createdAt: new Date().toISOString(),
     });
   });
@@ -950,13 +962,21 @@ function templateRows() {
     id: 'P-001', nama: 'Rudi Hartono', alamat: 'Jl. Merdeka No. 12, RT 02/RW 03',
     noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', tagihan: 'yes',
     kelompok: 'pelanggan lancar', jumlahTagihan: '250000', bulanTagihan: '2026-08',
-    pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+    pengirimanInv: 'done', pengirimanInvComment: 'Sudah dikirim via WA',
+    reminder1: 'done', reminder1Comment: 'Reminder via telpon',
+    reminder2: 'belum', reminder2Comment: '',
+    reminder3: 'belum', reminder3Comment: '',
+    reminder4: 'belum', reminder4Comment: '',
   };
   const contoh2 = {
     id: 'P-002', nama: 'Siti Aminah', alamat: 'Perum Griya Indah B-7',
     noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', tagihan: 'no',
     kelompok: 'blokir dulu baru bayar', jumlahTagihan: '0', bulanTagihan: '2026-07',
-    pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+    pengirimanInv: 'belum', pengirimanInvComment: '',
+    reminder1: 'belum', reminder1Comment: '',
+    reminder2: 'belum', reminder2Comment: '',
+    reminder3: 'belum', reminder3Comment: '',
+    reminder4: 'belum', reminder4Comment: '',
   };
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
   const header = PELANGGAN_FIELDS.map((f) => f.label);
@@ -1052,11 +1072,11 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
       <td>${escHtml(p.kelompok)}</td>
       <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
       <td class="c">${escHtml(fmtMonthID(p.bulanTagihan))}</td>
-      <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">R1 ${escHtml(p.reminder1 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">R2 ${escHtml(p.reminder2 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">R3 ${escHtml(p.reminder3 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">R4 ${escHtml(p.reminder4 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span>${p.pengirimanInvComment ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${escHtml(p.pengirimanInvComment)}</div>` : ''}</td>
+      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">R1 ${escHtml(p.reminder1 || 'belum')}</span>${p.reminder1Comment ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${escHtml(p.reminder1Comment)}</div>` : ''}</td>
+      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">R2 ${escHtml(p.reminder2 || 'belum')}</span>${p.reminder2Comment ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${escHtml(p.reminder2Comment)}</div>` : ''}</td>
+      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">R3 ${escHtml(p.reminder3 || 'belum')}</span>${p.reminder3Comment ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${escHtml(p.reminder3Comment)}</div>` : ''}</td>
+      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">R4 ${escHtml(p.reminder4 || 'belum')}</span>${p.reminder4Comment ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${escHtml(p.reminder4Comment)}</div>` : ''}</td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -1222,11 +1242,11 @@ function generateKolektorPDF(kolektor, pelanggan, month = '') {
       { label: 'Kelompok', width: 88, align: 'left' },
       { label: 'Jumlah Tagihan', width: 72, align: 'right' },
       { label: 'Bulan Tagihan', width: 74, align: 'center' },
-      { label: 'Kirim inv', width: 48, align: 'center' },
-      { label: 'Rem1', width: 34, align: 'center' },
-      { label: 'Rem2', width: 34, align: 'center' },
-      { label: 'Rem3', width: 34, align: 'center' },
-      { label: 'Rem4', width: 34, align: 'center' },
+      { label: 'Kirim inv', width: 60, align: 'center' },
+      { label: 'Rem1', width: 48, align: 'center' },
+      { label: 'Rem2', width: 48, align: 'center' },
+      { label: 'Rem3', width: 48, align: 'center' },
+      { label: 'Rem4', width: 48, align: 'center' },
     ];
     const tableW = cols.reduce((s, c) => s + c.width, 0);
     const headerH = 18;
@@ -1251,6 +1271,10 @@ function generateKolektorPDF(kolektor, pelanggan, month = '') {
     drawHeader();
 
     pelanggan.forEach((p, i) => {
+      const fmtDoneComment = (status, comment) => {
+        const s = status || 'belum';
+        return comment ? s + '\n' + comment : s;
+      };
       const cells = [
         String(i + 1),
         p.id,
@@ -1263,11 +1287,11 @@ function generateKolektorPDF(kolektor, pelanggan, month = '') {
         p.kelompok,
         'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
         fmtMonthID(p.bulanTagihan),
-        p.pengirimanInv || 'belum',
-        p.reminder1 || 'belum',
-        p.reminder2 || 'belum',
-        p.reminder3 || 'belum',
-        p.reminder4 || 'belum',
+        fmtDoneComment(p.pengirimanInv, p.pengirimanInvComment),
+        fmtDoneComment(p.reminder1, p.reminder1Comment),
+        fmtDoneComment(p.reminder2, p.reminder2Comment),
+        fmtDoneComment(p.reminder3, p.reminder3Comment),
+        fmtDoneComment(p.reminder4, p.reminder4Comment),
       ];
       // hitung tinggi baris
       let rowH = 12;
