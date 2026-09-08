@@ -1286,7 +1286,7 @@ function tagihanBulananTemplate() {
   const bulanIni = BULAN_ID[now.getMonth()];
   const bulanLalu = BULAN_ID[(now.getMonth() + 11) % 12];
   return [
-    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal 10 ${bulanIni.toUpperCase()} ${tahun}`,
+    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal 20 ${bulanIni.toUpperCase()} ${tahun}`,
     '',
     'Pembayaran ke kantor buka setiap hari senin-sabtu pada jam kerja (08:00-17:00).',
     'BAYAR KE KANTOR AKAN DIKENAKAN BIAYA ADMIN 5000',
