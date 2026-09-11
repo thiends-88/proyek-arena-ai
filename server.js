@@ -21,9 +21,12 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 // ---------------------------------------------------------------------------
 // Konstanta opsi (harus sinkron dengan frontend)
 // ---------------------------------------------------------------------------
-const STATUS_OPTIONS = ['aktif', 'blokir', 'putus', 'cuti'];
+const STATUS_OPTIONS = ['aktif', 'blokir', 'cuti', 'putus'];
 const INFRA_OPTIONS = ['wireless', 'fiber optic'];
-const TAGIHAN_OPTIONS = ['yes', 'no', 'free'];
+// Format pembayaran lama (yes/no/free) dinormalisasi ke dua pilihan baru ini.
+const PAYMENT_OPTIONS = ['lunas', 'belum'];
+const TAGIHAN_OPTIONS = PAYMENT_OPTIONS;
+const DONE_OPTIONS = ['belum', 'done'];   // dipakai: Pengiriman inv & Reminder1–4
 const KELOMPOK_OPTIONS = [
   'pelanggan lancar',
   'minta invoice',
@@ -32,6 +35,34 @@ const KELOMPOK_OPTIONS = [
   'bayar ke kantor',
   'minta jemput',
 ];
+
+// ---------------------------------------------------------------------------
+// DEFINISI KOLOM PELANGGAN — satu sumber kebenaran.
+// Diurutkan sesuai urutan tampilan form & template import.
+//   label   : judul kolom di template CSV / header tabel
+//   type    : text | phone | longtext | select | number | currency | day | done
+//   virtual : tidak disimpan sebagai field data (mis. id, kolektorId)
+//   aliases : nama kolom lain yang diterima saat import CSV/XLSX
+// Untuk memindah/menambah urutan field, cukup edit array ini.
+// ---------------------------------------------------------------------------
+const PELANGGAN_FIELDS = [
+  { key: 'id',            label: 'ID',                type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
+  { key: 'nama',          label: 'Customer',          type: 'text', required: true, aliases: ['customer', 'customers', 'nama pelanggan', 'namapelanggan', 'pelanggan', 'nama'] },
+  { key: 'status',        label: 'Status',            type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
+  { key: 'alamat',        label: 'Alamat Customer',   type: 'longtext', aliases: ['alamat customer', 'alamatcustomer', 'alamat', 'alamatpelanggan', 'alm', 'almat', 'address', 'lokasi', 'patok'] },
+  { key: 'noHp',          label: 'Telepon Customer',  type: 'phone', aliases: ['telepon customer', 'teleponcustomer', 'telpon customer', 'telponcustomer', 'no hp / wa', 'nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'telpon', 'nomor'] },
+  { key: 'bulanTagihan',  label: 'Bulan',             type: 'month', def: '', aliases: ['bulan', 'bulan tagihan', 'bulantagihan', 'periode', 'period', 'tagihan bulan', 'billing month', 'billingmonth'] },
+  { key: 'jumlahTagihan', label: 'Total',            type: 'currency', def: 0, aliases: ['total', 'jumlah tagihan', 'jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
+  { key: 'tagihan',       label: 'Pembayaran',        type: 'select', options: PAYMENT_OPTIONS, def: 'belum', aliases: ['pembayaran', 'status pembayaran', 'statuspembayaran', 'tagihan', 'statustagihan'] },
+  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done', def: 'belum', aliases: ['pengiriman inv', 'pengirimaninv', 'kirim inv', 'kiriminv', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1', 'invoice'] },
+  { key: 'reminder1',     label: 'Reminder 1',        type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
+  { key: 'reminder2',     label: 'Reminder 2',        type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
+  { key: 'reminder3',     label: 'Reminder 3',        type: 'done', def: 'belum', aliases: ['reminder3', 'reminder 3', 'rem3', 'pengingat3'] },
+  { key: 'reminder4',     label: 'Reminder 4',        type: 'done', def: 'belum', aliases: ['reminder4', 'reminder 4', 'rem4', 'pengingat4'] },
+];
+
+const FIELD_BY_KEY = Object.fromEntries(PELANGGAN_FIELDS.map((f) => [f.key, f]));
+const DATA_FIELDS = PELANGGAN_FIELDS.filter((f) => !f.virtual);
 
 // ---------------------------------------------------------------------------
 // Data layer (JSON file)
@@ -62,6 +93,22 @@ function saveDB(db) {
 }
 
 let db = loadDB();
+
+// Setiap baris pelanggan adalah snapshot untuk satu bulan. recordId internal
+// membedakan snapshot dengan ID pelanggan yang sama pada bulan berbeda, tanpa
+// menambah atau mengubah 15 kolom yang tampil di aplikasi.
+function ensureRecordIds(list) {
+  const used = new Set();
+  (list || []).forEach((p) => {
+    const base = p.recordId || `rec-${p.id || 'pelanggan'}-${p.bulanTagihan || 'tanpa-bulan'}`;
+    let key = base;
+    let n = 2;
+    while (used.has(key)) key = `${base}-${n++}`;
+    p.recordId = key;
+    used.add(key);
+  });
+}
+ensureRecordIds(db.pelanggan);
 
 // ---------------------------------------------------------------------------
 // Util
@@ -104,10 +151,10 @@ function normInfra(v) {
 }
 
 function normTagihan(v) {
-  const s = String(v).toLowerCase().trim();
-  if (['yes', 'y', 'ya', '1', 'ada', 'aktif'].includes(s)) return 'yes';
-  if (['no', 'n', 'tidak', '0', 'tdk'].includes(s)) return 'no';
-  if (['free', 'gratis', 'f'].includes(s)) return 'free';
+  const s = String(v == null ? '' : v).toLowerCase().trim();
+  // Format lama yes / no / free tetap diterima saat import dan restore.
+  if (['lunas', 'yes', 'y', 'ya', '1', 'ada', 'aktif', 'paid', 'sudah bayar', 'sudah dibayar'].includes(s)) return 'lunas';
+  if (['belum', 'no', 'n', 'tidak', '0', 'tdk', 'free', 'gratis', 'f', 'unpaid', 'belum bayar'].includes(s)) return 'belum';
   return null;
 }
 
@@ -145,6 +192,162 @@ function parseNumber(v) {
   return isNaN(n) ? 0 : n;
 }
 
+// --- Parser untuk tipe field baru (dipakai form & import CSV/XLSX) ---
+function normText(v, max = 200) {
+  const s = String(v == null ? '' : v).trim();
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+// done | belum — menerima 'done','selesai','ya','1','sudah','ok' dan 'belum','',0
+function normDone(v, def) {
+  const s = String(v == null ? '' : v).toLowerCase().trim();
+  if (s === '') return DONE_OPTIONS.includes(def) ? def : 'belum';
+  if (['done', 'selesai', 'sudah', 'ya', 'y', 'ok', '1', 'true', 'kirim', 'terkirim', 'sent'].includes(s)) return 'done';
+  if (['belum', 'no', 'n', '0', 'false', 'batal', 'pending'].includes(s)) return 'belum';
+  return DONE_OPTIONS.includes(s) ? s : (DONE_OPTIONS.includes(def) ? def : 'belum');
+}
+
+// Nomor HP/WA: buang pemisah (spasi, tanda hubung, titik ribuan dari Excel),
+// awali 0 bila ditulis 62…, dan tetap string agar nol di depan tidak hilang.
+function normPhone(v) {
+  if (v === null || v === undefined) return '';
+  let s = String(v).trim();
+  s = s.replace(/\.0+$/, '');            // 081234567890.0 (Excel) → 081234567890
+  s = s.replace(/[\s\-().]/g, '');       // pemisah
+  if (/^62\d+$/.test(s)) s = '0' + s.slice(2);
+  return s;
+}
+
+// Menerima 'YYYY-MM-DD', 'DD/MM/YYYY', 'DD-MM-YYYY', '31-12-2024', serial Excel,
+// atau tanggal bahasa Indonesia ('31/12/2024'). Keluaran selalu 'YYYY-MM-DD' atau ''.
+function normDate(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // nomor seri tanggal Excel (mis. 45323 → 2024-01-31), termasuk format XLSX 1900 dengan bug 1900
+  if (/^\d{4,6}$/.test(s)) {
+    const days = Number(s) - 1;
+    const d = new Date(Date.UTC(1899, 11, 31 + days));
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  const iso = s.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/);
+  if (iso) return `${iso[1]}-${String(iso[2]).padStart(2, '0')}-${String(iso[3]).padStart(2, '0')}`;
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+  if (dmy) {
+    let y = Number(dmy[3]);
+    if (y < 100) y += 2000;
+    return `${y}-${String(dmy[2]).padStart(2, '0')}-${String(dmy[1]).padStart(2, '0')}`;
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return '';
+}
+
+// Bulan tagihan: menerima 'YYYY-MM', 'Agustus 2026', '08/2026', 'agu26', '8-2026'
+// → keluaran 'YYYY-MM' (string) atau '' bila tidak dikenali.
+const BULAN_ALIAS = {
+  jan: 1, januari: 1, january: 1, janv: 1,
+  feb: 2, peb: 2, februari: 2, pebruari: 2, february: 2,
+  mar: 3, maret: 3, march: 3,
+  apr: 4, april: 4,
+  mei: 5, may: 5,
+  jun: 6, juni: 6, june: 6,
+  jul: 7, juli: 7, july: 7,
+  agu: 8, agt: 8, agustus: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  okt: 10, oct: 10, oktober: 10, october: 10,
+  nov: 11, november: 11,
+  des: 12, dec: 12, desember: 12, december: 12,
+};
+const BULAN_LABEL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function normMonth(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 7);
+
+  const s0 = String(v).trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!s0 || s0 === '0' || s0 === '-') return '';
+
+  let y = null, mo = null;
+  let m = s0.match(/^(\d{4})([-/.])(\d{1,2})(?:\2?(\d{1,2}))?$/);      // 2026-08 | 2026-08-15
+  if (m) { y = +m[1]; mo = +m[3]; }
+  if (y === null) {
+    m = s0.match(/^(\d{1,2})([-/.])(\d{2,4})$/);                         // 8/2026 | 08-26
+    if (m) { mo = +m[1]; y = +m[3]; if (y < 100) y += 2000; }
+  }
+  if (y === null) {
+    m = s0.match(/^(\d{4})[ ](\d{1,2})$/);                               // 2026 08
+    if (m) { y = +m[1]; mo = +m[2]; }
+  }
+  if (y === null) {
+    m = s0.match(/^(\d{2,4})[ .-]*([a-z]+)\.?$/);                        // 2026 agustus
+    if (m && BULAN_ALIAS[m[2]] !== undefined) { y = +m[1]; if (y < 100) y += 2000; mo = BULAN_ALIAS[m[2]]; }
+  }
+  if (y === null) {
+    m = s0.match(/^([a-z]+)\.? ?(\d{2,4})$/);                             // agustus 2026 | agu. 26
+    if (m && BULAN_ALIAS[m[1]] !== undefined) { y = +m[2]; if (y < 100) y += 2000; mo = BULAN_ALIAS[m[1]]; }
+  }
+  if (y === null) return '';
+  if (!(mo >= 1 && mo <= 12) || !(y >= 1990 && y <= 2199)) return '';
+  return y + '-' + String(mo).padStart(2, '0');
+}
+
+// 'YYYY-MM' → 'AGUSTUS 2026' (untuk laporan & tampilan)
+function fmtMonthID(iso) {
+  if (!iso) return '-';
+  const m = String(iso).match(/^(\d{4})-(\d{1,2})/);
+  if (!m) return String(iso);
+  const idx = Number(m[2]) - 1;
+  if (idx < 0 || idx > 11) return String(iso);
+  return BULAN_LABEL[idx] + ' ' + m[1];
+}
+
+// Migrasi ringan agar data dari versi/aplikasi kolektor lama langsung cocok dengan
+// format baru. Kolom lama tetap dibiarkan di JSON sebagai cadangan, tetapi kolom
+// yang dipakai aplikasi dinormalisasi ke key internal yang sama.
+function migratePelangganSchema(target) {
+  let changed = false;
+  (target.pelanggan || []).forEach((p) => {
+    const copy = (key, aliases) => {
+      if ((p[key] === undefined || p[key] === null || p[key] === '') && aliases.some((a) => p[a] !== undefined && p[a] !== null && p[a] !== '')) {
+        p[key] = p[aliases.find((a) => p[a] !== undefined && p[a] !== null && p[a] !== '')];
+        changed = true;
+      }
+    };
+    copy('nama', ['customer', 'customers']);
+    copy('alamat', ['alamatCustomer', 'alamat_customer']);
+    copy('noHp', ['teleponCustomer', 'telponCustomer', 'telepon_customer']);
+    copy('bulanTagihan', ['bulan']);
+    copy('jumlahTagihan', ['total']);
+    copy('tagihan', ['pembayaran']);
+
+    const status = normStatus(p.status);
+    if (status && status !== p.status) { p.status = status; changed = true; }
+    const payment = normTagihan(p.tagihan);
+    if (payment && payment !== p.tagihan) { p.tagihan = payment; changed = true; }
+    const month = normMonth(p.bulanTagihan);
+    if (month !== (p.bulanTagihan || '')) { p.bulanTagihan = month; changed = true; }
+    const total = parseNumber(p.jumlahTagihan);
+    if (total !== Number(p.jumlahTagihan || 0)) { p.jumlahTagihan = total; changed = true; }
+    ['pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'].forEach((key) => {
+      const done = normDone(p[key], 'belum');
+      if (done !== (p[key] || 'belum')) { p[key] = done; changed = true; }
+    });
+  });
+  return changed;
+}
+
+// Tanggal jatuh tempo: 1..28 (aman untuk semua bulan)
+function normDay(v) {
+  const n = parseNumber(v);
+  if (!n) return null;
+  return Math.min(28, Math.max(1, n));
+}
+
+if (migratePelangganSchema(db)) saveDB(db);
+
 function publicUser(u) {
   return { id: u.id, username: u.username, name: u.name, role: u.role };
 }
@@ -153,6 +356,17 @@ function escHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const STATUS_LABELS = { aktif: 'Aktif', blokir: 'Blokir', cuti: 'Cuti', putus: 'Putus' };
+const PAYMENT_LABELS = { lunas: 'Lunas', belum: 'Belum', yes: 'Lunas', no: 'Belum', free: 'Belum' };
+function statusLabel(value) {
+  const key = String(value || '').toLowerCase();
+  return STATUS_LABELS[key] || value || '-';
+}
+function paymentLabel(value) {
+  const key = String(value || '').toLowerCase();
+  return PAYMENT_LABELS[key] || value || 'Belum';
 }
 
 // ---------------------------------------------------------------------------
@@ -200,10 +414,10 @@ function seedDB() {
 
     const infrastruktur = pick(INFRA_OPTIONS);
 
-    let tagihan = 'no';
-    if (status === 'aktif') tagihan = rnd() < 0.85 ? 'yes' : 'no';
-    else if (status === 'cuti') tagihan = rnd() < 0.5 ? 'free' : 'no';
-    else if (status === 'blokir') tagihan = rnd() < 0.7 ? 'no' : 'yes';
+    let tagihan = 'belum';
+    if (status === 'aktif') tagihan = rnd() < 0.85 ? 'lunas' : 'belum';
+    else if (status === 'cuti') tagihan = 'belum';
+    else if (status === 'blokir') tagihan = rnd() < 0.3 ? 'lunas' : 'belum';
 
     let kelompok = 'pelanggan lancar';
     if (status === 'blokir') kelompok = pick(['blokir dulu baru bayar', 'butuh konfirmasi', 'minta invoice']);
@@ -212,20 +426,32 @@ function seedDB() {
     else kelompok = pick(['pelanggan lancar', 'minta invoice', 'minta jemput', 'bayar ke kantor', 'butuh konfirmasi']);
 
     let jumlahTagihan = 0;
-    if (tagihan === 'yes') jumlahTagihan = Math.round((150000 + rnd() * 400000) / 1000) * 1000;
+    if (tagihan === 'lunas') jumlahTagihan = Math.round((150000 + rnd() * 400000) / 1000) * 1000;
     else if (tagihan === 'free') jumlahTagihan = 0;
 
     const noHp = '08' + String(1200000000 + Math.floor(rnd() * 879999999)).padStart(10, '0');
+    const done = (p) => (rnd() < p ? 'done' : 'belum');
+    const alamat = 'Jl. ' + pick(['Merdeka', 'Melati', 'Anggrek', 'Kenanga', 'Dahlia', 'Mawar', 'Flamboyan', 'Cempaka'])
+      + ' No. ' + (1 + Math.floor(rnd() * 80)) + ', RT ' + String(1 + Math.floor(rnd() * 9)).padStart(2, '0');
+    const pengirimanInv = tagihan === 'lunas' ? done(0.55) : 'belum';
+    const jmlReminder = tagihan === 'lunas' ? Math.floor(rnd() * 5) : Math.floor(rnd() * 3);
     pelanggan.push({
       id: 'PLG-' + String(i + 1).padStart(4, '0'),
       kolektorId: kolektor.id,
       nama,
+      alamat,
       noHp,
       status,
       infrastruktur,
       tagihan,
       kelompok,
       jumlahTagihan,
+      bulanTagihan: (() => { const d = new Date(); d.setMonth(d.getMonth() - Math.floor(rnd() * 3)); return d.toISOString().slice(0, 7); })(),
+      pengirimanInv,
+      reminder1: jmlReminder >= 1 ? 'done' : 'belum',
+      reminder2: jmlReminder >= 2 ? 'done' : 'belum',
+      reminder3: jmlReminder >= 3 ? 'done' : 'belum',
+      reminder4: jmlReminder >= 4 ? 'done' : 'belum',
       createdAt: new Date().toISOString(),
     });
   });
@@ -350,7 +576,7 @@ app.get('/api/me', (req, res) => {
 // --- Kolektor (admin) ---
 app.get('/api/kolektor', requireAuth, requireAdmin, (req, res) => {
   const list = db.users.filter((u) => u.role === 'kolektor').map((u) => {
-    const pl = db.pelanggan.filter((p) => p.kolektorId === u.id);
+    const pl = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === u.id), req.query.bulan);
     return {
       ...publicUser(u),
       jumlahPelanggan: pl.length,
@@ -404,28 +630,111 @@ function scopedPelanggan(user) {
   return db.pelanggan.filter((p) => p.kolektorId === user.id);
 }
 
-app.get('/api/pelanggan', requireAuth, (req, res) => {
+function requestedMonth(value) {
+  if (!value || String(value).toUpperCase() === 'ALL') return '';
+  return normMonth(value);
+}
+
+function filterByMonth(list, value) {
+  const month = requestedMonth(value);
+  return month ? list.filter((p) => p.bulanTagihan === month) : list;
+}
+
+function recordKey(p) {
+  return p.recordId || p.id;
+}
+
+function findPelangganRecord(id) {
+  const key = String(id || '');
+  return db.pelanggan.find((p) => recordKey(p) === key) || db.pelanggan.find((p) => p.id === key);
+}
+
+function duplicateMonthlyRecord(id, month, except) {
+  return db.pelanggan.some((p) => p !== except && p.id === id && p.bulanTagihan === month);
+}
+
+// GET /api/bulan mengembalikan periode yang tersedia beserta jumlah datanya.
+app.get('/api/bulan', requireAuth, (req, res) => {
   let list = scopedPelanggan(req.user);
+  if (req.user.role === 'admin' && req.query.kolektorId) {
+    list = list.filter((p) => p.kolektorId === req.query.kolektorId);
+  }
+  const grouped = new Map();
+  list.forEach((p) => {
+    const value = p.bulanTagihan || '';
+    const row = grouped.get(value) || { value, jumlah: 0, totalTagihan: 0 };
+    row.jumlah += 1;
+    row.totalTagihan += Number(p.jumlahTagihan || 0);
+    grouped.set(value, row);
+  });
+  const bulan = Array.from(grouped.values())
+    .sort((a, b) => String(b.value).localeCompare(String(a.value)))
+    .map((row) => ({ ...row, label: row.value ? fmtMonthID(row.value) : 'Tanpa Bulan' }));
+  res.json({ bulan, total: list.length });
+});
+
+app.get('/api/pelanggan', requireAuth, (req, res) => {
+  let list = filterByMonth(scopedPelanggan(req.user), req.query.bulan);
   const { kolektorId } = req.query;
   if (req.user.role === 'admin' && kolektorId) {
     list = list.filter((p) => p.kolektorId === kolektorId);
   }
   const kolektorNames = {};
   db.users.forEach((u) => { kolektorNames[u.id] = u.name; });
-  res.json({ pelanggan: list.map((p) => ({ ...p, kolektorNama: kolektorNames[p.kolektorId] || '-' })) });
+  res.json({ pelanggan: list.map((p) => ({ ...p, recordId: recordKey(p), kolektorNama: kolektorNames[p.kolektorId] || '-' })) });
 });
 
+// Validasi berbasis PELANGGAN_FIELDS — label wajib & tipe diambil dari konfigurasi,
+// jadi menambah/memindah kolom tidak perlu mengubah fungsi ini.
 function validatePelanggan(body) {
-  const nama = String(body.nama || '').trim();
-  const noHp = String(body.noHp || '').trim();
-  if (!nama) return { error: 'Nama pelanggan wajib diisi.' };
-  if (!noHp) return { error: 'No HP/WA wajib diisi.' };
-  const status = STATUS_OPTIONS.includes(body.status) ? body.status : 'aktif';
-  const infrastruktur = INFRA_OPTIONS.includes(body.infrastruktur) ? body.infrastruktur : 'wireless';
-  const tagihan = TAGIHAN_OPTIONS.includes(body.tagihan) ? body.tagihan : 'no';
-  const kelompok = KELOMPOK_OPTIONS.includes(body.kelompok) ? body.kelompok : 'pelanggan lancar';
-  const jumlahTagihan = parseNumber(body.jumlahTagihan);
-  return { data: { nama, noHp, status, infrastruktur, tagihan, kelompok, jumlahTagihan } };
+  const data = {};
+  for (const f of DATA_FIELDS) {
+    const raw = body ? body[f.key] : undefined;
+    switch (f.type) {
+      case 'longtext':
+        data[f.key] = normText(raw, 500);
+        break;
+      case 'currency':
+        data[f.key] = parseNumber(raw);
+        break;
+      case 'number':
+        data[f.key] = parseNumber(raw);
+        break;
+      case 'done':
+        data[f.key] = normDone(raw, f.def);
+        break;
+      case 'month':
+        data[f.key] = normMonth(raw);
+        break;
+      case 'day': {
+        const d = normDay(raw);
+        data[f.key] = d === null ? (f.def === undefined ? null : f.def) : d;
+        break;
+      }
+      case 'select': {
+        let val;
+        if (f.options === STATUS_OPTIONS) val = normStatus(raw) || f.def || 'aktif';
+        else if (f.options === INFRA_OPTIONS) val = normInfra(raw) || f.def || 'wireless';
+        else if (f.options === TAGIHAN_OPTIONS) val = normTagihan(raw) || f.def || 'belum';
+        else if (f.options === KELOMPOK_OPTIONS) val = normKelompok(raw) || f.def || 'pelanggan lancar';
+        else val = f.options.includes(String(raw).toLowerCase().trim()) ? String(raw).toLowerCase().trim() : (f.def || f.options[0]);
+        data[f.key] = val;
+        break;
+      }
+      case 'phone': {
+        const ph = normPhone(raw);
+        if (ph && ph.replace(/\D/g, '').length < 8) return { error: 'Telepon Customer tidak valid — minimal 8 angka.' };
+        data[f.key] = ph;
+        break;
+      }
+      default: {
+        const s = normText(raw);
+        if (f.required && !s) return { error: f.label + ' wajib diisi.' };
+        data[f.key] = s;
+      }
+    }
+  }
+  return { data };
 }
 
 app.post('/api/pelanggan', requireAuth, (req, res) => {
@@ -440,59 +749,62 @@ app.post('/api/pelanggan', requireAuth, (req, res) => {
   // ID: gunakan ID dari input bila diisi & unik; jika kosong, buat otomatis.
   let id = String(req.body.id || '').trim();
   if (id) {
-    if (db.pelanggan.some((p) => p.id === id)) {
-      return res.status(400).json({ error: 'ID "' + id + '" sudah digunakan. Gunakan ID lain.' });
+    if (duplicateMonthlyRecord(id, v.data.bulanTagihan, null)) {
+      return res.status(400).json({ error: 'ID tersebut sudah ada pada bulan tagihan yang sama.' });
     }
   } else {
     db.meta.seqPelanggan += 1;
     id = 'PLG-' + String(db.meta.seqPelanggan).padStart(4, '0');
   }
-  const pelanggan = { id, kolektorId, ...v.data, createdAt: new Date().toISOString() };
+  const pelanggan = { recordId: uid('rec'), id, kolektorId, ...v.data, createdAt: new Date().toISOString() };
   db.pelanggan.push(pelanggan);
   saveDB(db);
   res.json({ pelanggan });
 });
 
 app.put('/api/pelanggan/:id', requireAuth, (req, res) => {
-  const p = db.pelanggan.find((x) => x.id === req.params.id);
+  const p = findPelangganRecord(req.params.id);
   if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
   const v = validatePelanggan(req.body || {});
   if (v.error) return res.status(400).json({ error: v.error });
+  if (duplicateMonthlyRecord(p.id, v.data.bulanTagihan, p)) {
+    return res.status(400).json({ error: 'ID tersebut sudah ada pada bulan tagihan yang sama.' });
+  }
   Object.assign(p, v.data);
   if (req.user.role === 'admin' && req.body.kolektorId) {
     const k = db.users.find((u) => u.id === req.body.kolektorId && u.role === 'kolektor');
     if (k) p.kolektorId = k.id;
   }
   saveDB(db);
-  res.json({ pelanggan: p });
+  res.json({ pelanggan: { ...p, recordId: recordKey(p) } });
 });
 
 app.delete('/api/pelanggan/:id', requireAuth, (req, res) => {
-  const idx = db.pelanggan.findIndex((x) => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
-  const p = db.pelanggan[idx];
+  const p = findPelangganRecord(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
-  db.pelanggan.splice(idx, 1);
-  db.pesan = db.pesan.filter((m) => m.pelangganId !== p.id);
+  db.pelanggan = db.pelanggan.filter((row) => row !== p);
+  const keys = new Set([p.id, recordKey(p)]);
+  db.pesan = db.pesan.filter((m) => !keys.has(m.pelangganId));
   saveDB(db);
   res.json({ ok: true });
 });
 
 // --- Pesan (WhatsApp) ---
 app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
-  const p = db.pelanggan.find((x) => x.id === req.params.id);
+  const p = findPelangganRecord(req.params.id);
   if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
   if (req.user.role !== 'admin' && p.kolektorId !== req.user.id) {
     return res.status(403).json({ error: 'Anda tidak punya akses ke data ini.' });
   }
   const teks = String(req.body.teks || '').trim();
   if (!teks) return res.status(400).json({ error: 'Pesan tidak boleh kosong.' });
-  const msg = { id: uid('msg'), pelangganId: p.id, kolektorId: req.user.id, teks, waktu: new Date().toISOString() };
+  const msg = { id: uid('msg'), pelangganId: recordKey(p), kolektorId: req.user.id, teks, waktu: new Date().toISOString() };
   db.pesan.push(msg);
   saveDB(db);
   res.json({ ok: true, wa: waLink(p.noHp, teks) });
@@ -501,7 +813,7 @@ app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
 app.get('/api/pesan', requireAuth, (req, res) => {
   let list = req.user.role === 'admin' ? db.pesan : db.pesan.filter((m) => m.kolektorId === req.user.id);
   const names = {};
-  db.pelanggan.forEach((p) => { names[p.id] = p.nama; });
+  db.pelanggan.forEach((p) => { names[p.id] = p.nama; names[recordKey(p)] = p.nama; });
   const users = {};
   db.users.forEach((u) => { users[u.id] = u.name; });
   list = list
@@ -560,6 +872,8 @@ app.post('/api/restore', requireAuth, requireAdmin, upload.single('file'), (req,
   db = parsed;
   if (!db.meta || typeof db.meta !== 'object') db.meta = {};
   if (!Array.isArray(db.pesan)) db.pesan = [];
+  ensureRecordIds(db.pelanggan);
+  migratePelangganSchema(db);
   // hitung ulang counter ID otomatis agar tidak bentrok
   const maxSeq = (db.pelanggan || []).reduce((m, p) => {
     const mt = /^PLG-(\d+)$/.exec(String(p.id || ''));
@@ -573,32 +887,64 @@ app.post('/api/restore', requireAuth, requireAdmin, upload.single('file'), (req,
 });
 
 // --- Import file (CSV / XLSX) ---
+// Perbaikan kehilangan angka nol di depan pada import:
+// sheet_to_json berubah menjadi number (mis. '081234567890' → 81234567890).
+// Bila teks asli sel (cell.w) memang berawalan 0, pakai teks itu.
+function keepTextNumbers(ws, rows) {
+  if (!ws || !ws['!ref']) return rows;
+  let range;
+  try { range = XLSX.utils.decode_range(ws['!ref']); } catch (e) { return rows; }
+  const header = [];
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const c = ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+    header[C - range.s.c] = c ? String(c.v) : '';
+  }
+  const numericCols = new Set();
+  rows.forEach((row) => {
+    Object.keys(row).forEach((label) => {
+      if (typeof row[label] === 'number' && Math.trunc(row[label]) === row[label]) numericCols.add(label);
+    });
+  });
+  if (!numericCols.size) return rows;
+  rows.forEach((row, i) => {
+    const r = range.s.r + 1 + i;
+    numericCols.forEach((label) => {
+      const col = header.findIndex((h) => String(h).trim().toLowerCase() === String(label).trim().toLowerCase());
+      if (col < 0) return;
+      const cell = ws[XLSX.utils.encode_cell({ r, c: range.s.c + col })];
+      if (!cell || cell.t !== 'n') return;
+      const rawText = cell.w != null ? String(cell.w) : String(cell.v);
+      if (/^0\d/.test(rawText)) row[label] = rawText;
+    });
+  });
+  return rows;
+}
+
 app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan.' });
   const kolektorId = req.body.kolektorId;
+  const defaultBulan = normMonth(req.body.defaultBulan);
   const k = db.users.find((u) => u.id === kolektorId && u.role === 'kolektor');
   if (!k) return res.status(400).json({ error: 'Pilih kolektor tujuan terlebih dahulu.' });
 
   let rows;
   try {
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    // raw: true → nilai mentah (tidak diformat) supaya angka tetap akurat.
+    rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+    rows = keepTextNumbers(ws, rows);
   } catch (e) {
     return res.status(400).json({ error: 'Gagal membaca file. Pastikan format CSV/XLSX benar.' });
   }
   if (!rows.length) return res.status(400).json({ error: 'File kosong / tidak ada baris data.' });
 
-  const FIELD_MAP = {
-    id: 'id',
-    nama: 'nama', namapelanggan: 'nama', namapelangggan: 'nama', pelanggan: 'nama',
-    nohp: 'noHp', hp: 'noHp', nohpwa: 'noHp', nowa: 'noHp', whatsapp: 'noHp', wa: 'noHp', notelepon: 'noHp', notelp: 'noHp', telepon: 'noHp', nomor: 'noHp',
-    status: 'status',
-    infrastruktur: 'infrastruktur', infra: 'infrastruktur',
-    tagihan: 'tagihan', statustagihan: 'tagihan',
-    kelompok: 'kelompok',
-    jumlahtagihan: 'jumlahTagihan', jumlah: 'jumlahTagihan', nominal: 'jumlahTagihan', nominaltagihan: 'jumlahTagihan', tagihanjumlah: 'jumlahTagihan',
-  };
+  // FIELD_MAP dibangun dari PELANGGAN_FIELDS.aliases → selalu sinkron dengan form/template.
+  const FIELD_MAP = {};
+  PELANGGAN_FIELDS.forEach((f) => {
+    const keys = [String(f.label).toLowerCase(), f.key, ...(f.aliases || [])];
+    keys.forEach((k) => { FIELD_MAP[normKey(k)] = f.key; });
+  });
 
   const imported = [];
   const errors = [];
@@ -610,14 +956,14 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
       if (canon) mapped[canon] = raw[key];
     });
     if (!mapped.nama && !mapped.noHp) {
-      errors.push(`Baris ${i + 2}: tidak ada kolom nama/no HP yang dikenali.`);
+      errors.push(`Baris ${i + 2}: tidak ada kolom Customer/Telepon Customer yang dikenali.`);
       return;
     }
     const nama = String(mapped.nama || '').trim();
     const noHp = String(mapped.noHp || '').trim();
     if (!nama && !noHp) return; // baris kosong
-    if (!nama) { errors.push(`Baris ${i + 2}: nama kosong.`); return; }
-    if (!noHp) { errors.push(`Baris ${i + 2}: no HP kosong.`); return; }
+    if (!nama) { errors.push(`Baris ${i + 2}: Customer kosong.`); return; }
+    if (!noHp) { errors.push(`Baris ${i + 2}: Telepon Customer kosong.`); return; }
 
     // ID mengikuti data import (tidak dibuat otomatis oleh sistem)
     const id = (mapped.id === null || mapped.id === undefined) ? '' : String(mapped.id).trim();
@@ -625,19 +971,20 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
       errors.push(`Baris ${i + 2}: ID kosong — baris dilewati (ID harus diisi sesuai data Anda).`);
       return;
     }
-    if (db.pelanggan.some((p) => p.id === id) || importedIds.has(id)) {
-      errors.push(`Baris ${i + 2}: ID "${id}" sudah ada / duplikat — baris dilewati.`);
+    // Bila kolom Bulan kosong, gunakan periode yang dipilih di dialog import.
+    if (!mapped.bulanTagihan && defaultBulan) mapped.bulanTagihan = defaultBulan;
+
+    // Validasi + normalisasi memakai aturan yang sama dengan form input
+    const v = validatePelanggan(mapped);
+    if (v.error) { errors.push(`Baris ${i + 2}: ${v.error}`); return; }
+    const monthlyKey = id + '::' + (v.data.bulanTagihan || 'tanpa-bulan');
+    if (duplicateMonthlyRecord(id, v.data.bulanTagihan, null) || importedIds.has(monthlyKey)) {
+      errors.push(`Baris ${i + 2}: ID "${id}" sudah ada pada bulan yang sama / duplikat — baris dilewati.`);
       return;
     }
-    importedIds.add(id);
+    importedIds.add(monthlyKey);
 
-    const status = normStatus(mapped.status) || 'aktif';
-    const infrastruktur = normInfra(mapped.infrastruktur) || 'wireless';
-    const tagihan = normTagihan(mapped.tagihan) || 'no';
-    const kelompok = normKelompok(mapped.kelompok) || 'pelanggan lancar';
-    const jumlahTagihan = parseNumber(mapped.jumlahTagihan);
-
-    db.pelanggan.push({ id, kolektorId: k.id, nama, noHp, status, infrastruktur, tagihan, kelompok, jumlahTagihan, createdAt: new Date().toISOString() });
+    db.pelanggan.push({ recordId: uid('rec'), id, kolektorId: k.id, ...v.data, createdAt: new Date().toISOString() });
     imported.push({ id, nama, noHp });
   });
 
@@ -646,17 +993,46 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 });
 
 // --- Template import ---
+// Header & baris contoh dibangun dari PELANGGAN_FIELDS, sehingga template selalu
+// sama dengan field yang ada di form input.
+function templateRows() {
+  const contoh = {
+    id: 'PG000163', nama: '(PG000163) PENGADILAN AGAMA SOLOK (Aktif)',
+    alamat: 'JL. KAPT. BAHAR HAMID, KEL LAING, KEC. TJ. HARAPAN, KOTA SOLOK',
+    noHp: '085237571144', status: 'aktif', tagihan: 'lunas',
+    jumlahTagihan: '14000000', bulanTagihan: '2026-08',
+    pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+  };
+  const contoh2 = {
+    id: 'PG000164', nama: '(PG000164) CONTOH CUSTOMER (Aktif)', alamat: 'Alamat contoh customer',
+    noHp: '081234567890', status: 'aktif', tagihan: 'belum',
+    jumlahTagihan: '250000', bulanTagihan: '2026-08',
+    pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+  };
+  const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
+  const header = PELANGGAN_FIELDS.map((f) => f.label);
+  const rows = [contoh, contoh2].map((o) => PELANGGAN_FIELDS.map((f) => csvCell(o[f.key] == null ? '' : o[f.key])));
+  return { header, rows };
+}
+
 app.get('/api/template.csv', requireAuth, requireAdmin, (req, res) => {
-  const header = ['ID', 'Nama Pelanggan', 'No HP / WA', 'Status', 'Infrastruktur', 'Tagihan', 'Kelompok', 'Jumlah Tagihan'];
-  const contoh = [
-    ['P-001', 'Rudi Hartono', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000'],
-    ['P-002', 'Siti Aminah', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0'],
-  ];
-  const lines = [header.join(','), ...contoh.map((r) => r.join(','))];
+  const { header, rows } = templateRows();
+  const lines = [header.join(','), ...rows.map((r) => r.join(','))];
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="template-import-pelanggan.csv"');
   res.send('\uFEFF' + lines.join('\n'));
 });
+
+// Daftar kolom untuk frontend (dipakai form, tabel, dan pratinjau template)
+app.get('/api/fields', requireAuth, (req, res) => {
+  res.json({
+    fields: PELANGGAN_FIELDS.map((f) => ({
+      key: f.key, label: f.label, type: f.type, required: !!f.required, virtual: !!f.virtual,
+      placeholder: f.placeholder || '', def: f.def === undefined ? '' : f.def, options: f.options || null,
+    })),
+  });
+});
+
 
 // --- Dashboard / analisa ---
 function aggregate(list) {
@@ -670,19 +1046,29 @@ function aggregate(list) {
     putus: count((p) => p.status === 'putus'),
     cuti: count((p) => p.status === 'cuti'),
     statusCounts: STATUS_OPTIONS.map((s) => ({ label: s, value: count((p) => p.status === s) })),
-    infraCounts: INFRA_OPTIONS.map((s) => ({ label: s, value: count((p) => p.infrastruktur === s) })),
     tagihanCounts: TAGIHAN_OPTIONS.map((s) => ({ label: s, value: count((p) => p.tagihan === s) })),
+    reminderCounts: [
+      ['Pengiriman inv', 'pengirimanInv'],
+      ['Reminder 1', 'reminder1'],
+      ['Reminder 2', 'reminder2'],
+      ['Reminder 3', 'reminder3'],
+      ['Reminder 4', 'reminder4'],
+    ].map(([label, key]) => ({ label, value: count((p) => p[key] === 'done') })),
+    // Dua rekap lama dibiarkan di API agar backup/klien lama tidak rusak.
+    infraCounts: INFRA_OPTIONS.map((s) => ({ label: s, value: count((p) => p.infrastruktur === s) })),
     kelompokCounts: KELOMPOK_OPTIONS.map((s) => ({ label: s, value: count((p) => p.kelompok === s) })),
   };
 }
 
 app.get('/api/dashboard', requireAuth, (req, res) => {
-  const list = scopedPelanggan(req.user);
+  const month = requestedMonth(req.query.bulan);
+  const list = filterByMonth(scopedPelanggan(req.user), month);
   const data = aggregate(list);
+  data.bulan = month || 'ALL';
   if (req.user.role === 'admin') {
     data.totalKolektor = db.users.filter((u) => u.role === 'kolektor').length;
     data.perKolektor = db.users.filter((u) => u.role === 'kolektor').map((u) => {
-      const pl = db.pelanggan.filter((p) => p.kolektorId === u.id);
+      const pl = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === u.id), month);
       const a = aggregate(pl);
       return { kolektorId: u.id, nama: u.name, username: u.username, ...a };
     });
@@ -690,7 +1076,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     data.perKolektor = [];
   }
   const names = {};
-  db.pelanggan.forEach((p) => { names[p.id] = p.nama; });
+  db.pelanggan.forEach((p) => { names[p.id] = p.nama; names[recordKey(p)] = p.nama; });
   const users = {};
   db.users.forEach((u) => { users[u.id] = u.name; });
   data.recentPesan = db.pesan
@@ -706,26 +1092,33 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
 app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) => {
   const k = db.users.find((u) => u.id === req.params.kolektorId && u.role === 'kolektor');
   if (!k) return res.status(404).json({ error: 'Kolektor tidak ditemukan.' });
-  const pelanggan = db.pelanggan.filter((p) => p.kolektorId === k.id);
+  const month = requestedMonth(req.query.bulan);
+  const pelanggan = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === k.id), month);
   const a = aggregate(pelanggan);
   const today = new Date().toLocaleString('id-ID', { dateStyle: 'long' });
+  const periodLabel = month ? fmtMonthID(month) : 'Semua Bulan';
 
   const rows = pelanggan.map((p, i) => `
     <tr>
       <td class="c">${i + 1}</td>
       <td>${escHtml(p.id)}</td>
       <td>${escHtml(p.nama)}</td>
+      <td><span class="pill pill-${escHtml(p.status)}">${escHtml(statusLabel(p.status))}</span></td>
+      <td>${escHtml(p.alamat)}</td>
       <td>${escHtml(p.noHp)}</td>
-      <td><span class="pill pill-${escHtml(p.status)}">${escHtml(p.status)}</span></td>
-      <td>${escHtml(p.infrastruktur)}</td>
-      <td>${escHtml(p.tagihan)}</td>
-      <td>${escHtml(p.kelompok)}</td>
+      <td class="c">${escHtml(fmtMonthID(p.bulanTagihan))}</td>
       <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
+      <td class="c"><span class="pill ${p.tagihan === 'lunas' || p.tagihan === 'yes' ? 'pill-done' : 'pill-todo'}">${escHtml(paymentLabel(p.tagihan))}</span></td>
+      <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder1 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder2 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder3 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder4 || 'belum')}</span></td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Laporan ${escHtml(k.name)}</title>
+<title>Laporan ${escHtml(k.name)} — ${escHtml(periodLabel)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; background: #fff; }
@@ -747,13 +1140,15 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   .pill-aktif { background:#dcfce7; color:#15803d; }
   .pill-blokir { background:#fee2e2; color:#b91c1c; }
   .pill-putus { background:#e2e8f0; color:#475569; }
+  .pill-done { background:#dcfce7; color:#15803d; }
+  .pill-todo { background:#f1f5f9; color:#64748b; }
   .pill-cuti { background:#fef3c7; color:#b45309; }
   .foot { margin-top: 14px; font-size: 11px; color: #94a3b8; }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   @media (max-width: 600px) {
     body { padding: 14px; }
     .head h1 { font-size: 17px; }
-    .table-scroll table { min-width: 640px; }
+    .table-scroll table { min-width: 900px; }
   }
   @media print {
     body { padding: 0; }
@@ -771,6 +1166,7 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
   <div class="meta">
     <span>Nama Kolektor: <b>${escHtml(k.name)}</b></span>
     <span>Username: <b>${escHtml(k.username)}</b></span>
+    <span>Periode: <b>${escHtml(periodLabel)}</b></span>
     <span>Tanggal: <b>${escHtml(today)}</b></span>
   </div>
   <div class="cards">
@@ -782,8 +1178,8 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
   <div class="table-scroll"><table>
-    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
+    <thead><tr><th>No</th><th>ID</th><th>Customer</th><th>Status</th><th>Alamat Customer</th><th>Telepon Customer</th><th>Bulan</th><th>Total</th><th>Pembayaran</th><th>Pengiriman inv</th><th>Reminder 1</th><th>Reminder 2</th><th>Reminder 3</th><th>Reminder 4</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="14">Tidak ada data.</td></tr>'}</tbody>
   </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
 </body></html>`;
@@ -796,10 +1192,12 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
 app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, res) => {
   const k = db.users.find((u) => u.id === req.params.kolektorId && u.role === 'kolektor');
   if (!k) return res.status(404).json({ error: 'Kolektor tidak ditemukan.' });
-  const pelanggan = db.pelanggan.filter((p) => p.kolektorId === k.id);
+  const month = requestedMonth(req.query.bulan);
+  const pelanggan = filterByMonth(db.pelanggan.filter((p) => p.kolektorId === k.id), month);
   try {
-    const buffer = await generateKolektorPDF(k, pelanggan);
-    const fname = 'laporan-' + k.username + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    const buffer = await generateKolektorPDF(k, pelanggan, month);
+    const suffix = month ? '-' + month : '-semua-bulan';
+    const fname = 'laporan-' + k.username + suffix + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
     res.setHeader('Content-Type', 'application/pdf');
     // view=1 → tampilkan inline (untuk dibuka di tab baru), default → unduh
     const disp = req.query.view === '1' ? 'inline' : 'attachment';
@@ -811,9 +1209,11 @@ app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, re
   }
 });
 
-function generateKolektorPDF(kolektor, pelanggan) {
+function generateKolektorPDF(kolektor, pelanggan, month = '') {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+    // A4 landscape dipakai agar tabel Customer, alamat, telepon, dan 5 kolom progres
+    // tetap terbaca saat dicetak.
+    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -834,6 +1234,7 @@ function generateKolektorPDF(kolektor, pelanggan) {
       .text('Nama Kolektor   : ' + kolektor.name)
       .text('Username        : ' + kolektor.username)
       .text('Tanggal Cetak   : ' + today)
+      .text('Periode         : ' + (month ? fmtMonthID(month) : 'Semua Bulan'))
       .moveDown(0.6);
 
     // Ringkasan
@@ -867,15 +1268,20 @@ function generateKolektorPDF(kolektor, pelanggan) {
 
     // Tabel
     const cols = [
-      { label: 'No', width: 22, align: 'center' },
-      { label: 'ID', width: 50, align: 'left' },
-      { label: 'Nama Pelanggan', width: 90, align: 'left' },
-      { label: 'No HP / WA', width: 76, align: 'left' },
-      { label: 'Status', width: 40, align: 'left' },
-      { label: 'Infra', width: 52, align: 'left' },
-      { label: 'Tagihan', width: 38, align: 'left' },
-      { label: 'Kelompok', width: 90, align: 'left' },
-      { label: 'Jumlah', width: 57, align: 'right' },
+      { label: 'No', width: 20, align: 'center' },
+      { label: 'ID', width: 48, align: 'left' },
+      { label: 'Customer', width: 105, align: 'left' },
+      { label: 'Status', width: 44, align: 'left' },
+      { label: 'Alamat Customer', width: 120, align: 'left' },
+      { label: 'Telepon Customer', width: 68, align: 'left' },
+      { label: 'Bulan', width: 58, align: 'center' },
+      { label: 'Total', width: 62, align: 'right' },
+      { label: 'Pembayaran', width: 55, align: 'center' },
+      { label: 'Pengiriman inv', width: 45, align: 'center' },
+      { label: 'Reminder 1', width: 34, align: 'center' },
+      { label: 'Reminder 2', width: 34, align: 'center' },
+      { label: 'Reminder 3', width: 34, align: 'center' },
+      { label: 'Reminder 4', width: 34, align: 'center' },
     ];
     const tableW = cols.reduce((s, c) => s + c.width, 0);
     const headerH = 18;
@@ -904,12 +1310,17 @@ function generateKolektorPDF(kolektor, pelanggan) {
         String(i + 1),
         p.id,
         p.nama,
-        p.noHp,
-        p.status,
-        p.infrastruktur,
-        p.tagihan,
-        p.kelompok,
-        'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
+        statusLabel(p.status),
+        p.alamat || '-',
+        p.noHp || '-',
+        fmtMonthID(p.bulanTagihan),
+        (p.jumlahTagihan || 0).toLocaleString('id-ID'),
+        paymentLabel(p.tagihan),
+        p.pengirimanInv || 'belum',
+        p.reminder1 || 'belum',
+        p.reminder2 || 'belum',
+        p.reminder3 || 'belum',
+        p.reminder4 || 'belum',
       ];
       // hitung tinggi baris
       let rowH = 12;
@@ -959,6 +1370,13 @@ app.get('*', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Aplikasi berjalan di http://0.0.0.0:${PORT}`);
-  console.log('Login admin: admin / admin123');
-  console.log('Login kolektor: andi|budi|citra / kolektor123');
+  // Tidak lagi mencetak kredensial ke log. Cukup beri peringatan bila masih ada akun
+  // yang memakai password bawaan data contoh.
+  try {
+    const db = loadDB();
+    const bawaan = (db.users || []).filter((u) => verifyPassword('admin123', u.password)).length;
+    if (bawaan > 0) {
+      console.log(`⚠️  ${bawaan} akun masih memakai password bawaan — ganti sebelum dipakai (ikon 🔑 di sidebar).`);
+    }
+  } catch { /* abaikan */ }
 });
