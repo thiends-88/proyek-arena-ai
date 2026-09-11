@@ -239,9 +239,11 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .b-cuti { background: #fef3c7; color: #b45309; }
 .b-wireless { background: #ccfbf1; color: #0f766e; }
 .b-fiber-optic { background: #ede9fe; color: #6d28d9; }
+.b-lunas { background: #dcfce7; color: #15803d; }
+.b-belum { background: #fee2e2; color: #b91c1c; }
+/* Nilai lama tetap aman bila ada cache/data sebelum migrasi. */
 .b-yes { background: #dcfce7; color: #15803d; }
-.b-no { background: #fee2e2; color: #b91c1c; }
-.b-free { background: #dbeafe; color: #1d4ed8; }
+.b-no, .b-free { background: #fee2e2; color: #b91c1c; }
 .b-kelompok0 { background: #dcfce7; color: #15803d; }
 .b-kelompok1 { background: #fef3c7; color: #b45309; }
 .b-kelompok2 { background: #fee2e2; color: #b91c1c; }
