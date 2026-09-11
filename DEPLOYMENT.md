@@ -329,38 +329,74 @@ sudo systemctl start kolektorapp
 
 ---
 
-## I. Update Aplikasi (saat ada versi baru)
+## I. Update Aplikasi dari GitHub (saat ada versi baru)
 
-Versi stabil ada di branch `main`. Perkembangan terbaru sementara ada di branch sesi,
-mis. `arena/01a06009-proyek-arena-ai` (akan digabung ke `main` setelah mantap).
+Bisa. Kode perubahan terbaru dari sesi ini sudah tersedia di branch GitHub:
+`arena/01a08f7f-proyek-arena-ai`.
 
-**Kalau server Anda sebelumnya memakai branch sesi lama** (mis. `arena/01a05fcb-proyek-arena-ai`),
-ambil branch terbaru sekali saja:
+> Untuk produksi, cara paling aman adalah menunggu branch ini digabung ke `main`, lalu
+> server cukup mengikuti `main`. Jika ingin memakai perubahan ini sekarang, gunakan
+> branch sesi tersebut secara eksplisit seperti langkah di bawah.
+
+### Update pertama ke branch perubahan ini
+
+Jalankan di dalam container/VM Proxmox sebagai user pemilik aplikasi:
 
 ```bash
 cd /opt/kolektorapp
+
+# Pastikan data aman sebelum update — data aplikasi ada di data/db.json
+cp -a data "data.backup-$(date +%F-%H%M)"
+
+# Cek apakah ada perubahan lokal sebelum mengambil kode
+git status
+
 git fetch origin
-git checkout arena/01a06009-proyek-arena-ai      # cukup sekali
-npm install
+git checkout -B arena/01a08f7f-proyek-arena-ai origin/arena/01a08f7f-proyek-arena-ai
+npm ci --omit=dev
 sudo systemctl restart kolektorapp
+sudo systemctl status kolektorapp --no-pager
 ```
 
-**Setelah itu, update rutin:**
+Jika service belum memakai systemd, hentikan proses `npm start` lama dengan `Ctrl+C`, lalu jalankan:
+
+```bash
+npm start
+```
+
+### Update rutin berikutnya dari branch yang sama
 
 ```bash
 cd /opt/kolektorapp
-git pull                      # atau: git pull origin arena/01a06009-proyek-arena-ai
-npm install
+cp -a data "data.backup-$(date +%F-%H%M)"
+git fetch origin
+git pull --ff-only origin arena/01a08f7f-proyek-arena-ai
+npm ci --omit=dev
+sudo systemctl restart kolektorapp
+sudo systemctl status kolektorapp --no-pager
+```
+
+### Jika branch sudah digabung ke `main`
+
+Setelah pull request digabung, server produksi dapat dikembalikan ke branch stabil:
+
+```bash
+cd /opt/kolektorapp
+cp -a data "data.backup-$(date +%F-%H%M)"
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+npm ci --omit=dev
 sudo systemctl restart kolektorapp
 ```
 
-> Data di `data/db.json` **tidak** terpengaruh oleh `git pull` (folder `data/` di-ignore git).
+> Folder `data/` dan file `data/db.json` tidak terpengaruh oleh `git pull` karena di-ignore
+> Git. Backup tetap disarankan karena aplikasi akan menjalankan migrasi ringan ketika versi
+> baru mulai, misalnya menyesuaikan nilai pembayaran lama `yes/no/free` menjadi `Lunas/Belum`.
 
 > Setelah update, buka aplikasi di HP lalu **refresh** (tarik ke bawah / tekan ⟳). Jika tampilan lama masih
-> muncul, tutup tab browser lalu buka kembali — server sudah mengirim header no-cache sehingga file baru
+> muncul, tutup tab browser lalu buka kembali — server mengirim header no-cache sehingga file baru
 > otomatis dipakai.
-
----
 
 ## Ringkasan Cepat
 

@@ -9,40 +9,36 @@ Aplikasi web untuk mengelola data **kolektor** dan **pelanggan** (internet), len
 - **Input kolektor** — tambah/edit/hapus akun kolektor (username + password).
 - **Import file** — import data pelanggan dari file **CSV / XLSX** ke kolektor tertentu.
 - **Export PDF** — cetak laporan data pelanggan per kolektor (ringkasan + tabel lengkap).
-- **Dashboard analisa** — grafik & statistik menarik (status, infrastruktur, tagihan, kelompok, rekap per kolektor).
+- **Dashboard analisa** — grafik & statistik menarik (status, pembayaran, progress pengiriman/reminder, dan rekap per kolektor).
 
 ### 🧑‍💼 Kolektor
 - Hanya bisa melihat data pelanggan **miliknya sendiri** (data lain di-blokir oleh server).
 - Fitur per data pelanggan: **Edit**, **Hapus**, dan **Kirim pesan** ke pelanggan (via WhatsApp).
 
 ### 📋 Data Pelanggan (per kolektor)
-Form input **rata/flat** dengan urutan persis seperti template import — tidak ada bagian lain.
+Form input dan tabel dibuat **rata/flat** agar sama dengan format data kolektor yang sudah digunakan sebelumnya. Urutan kolomnya:
 
 | # | Field | Nilai |
 |---|-------|-------|
-| 1 | ID | otomatis (`PLG-0001`, dst.) — boleh diisi manual (ID dari data Anda, harus unik) |
-| 2 | Nama Pelanggan | teks **(wajib)** |
-| 3 | Alamat | teks (multi-baris) |
-| 4 | No HP / WA | teks — spasi/tanda hubung dibersihkan otomatis, `62…` → `0…` |
-| 5 | Status | `aktif` · `blokir` · `putus` · `cuti` |
-| 6 | Infrastruktur | `wireless` · `fiber optic` |
-| 7 | Tagihan | `yes` · `no` · `free` |
-| 8 | Kelompok | `pelanggan lancar` · `minta invoice` · `butuh konfirmasi` · `blokir dulu baru bayar` · `bayar ke kantor` · `minta jemput` |
-| 9 | Jumlah Tagihan | angka — diketik biasa, tampil otomatis `150.000` |
-| 10 | Bulan Tagihan | bulan + tahun — pilih `Agustus 2026` (input bulan), tersimpan `YYYY-MM` |
-| 11 | Pengiriman inv | **`done`** / **`belum`** |
-| 12 | Reminder1 | **`done`** / **`belum`** |
-| 13 | Reminder2 | **`done`** / **`belum`** |
-| 14 | Reminder3 | **`done`** / **`belum`** |
-| 15 | Reminder4 | **`done`** / **`belum`** |
+| 1 | ID | boleh diisi manual (contoh `PG000163`); bila input manual dikosongkan, sistem membuat ID otomatis |
+| 2 | Customer | teks **(wajib)** — dapat berisi format lama, misalnya `(PG000163) PENGADILAN AGAMA SOLOK (Aktif)` |
+| 3 | Status | `Aktif` · `Blokir` · `Cuti` · `Putus` |
+| 4 | Alamat Customer | teks alamat |
+| 5 | Telepon Customer | nomor telepon/WA; spasi/tanda hubung dibersihkan otomatis, `62…` → `0…` |
+| 6 | Bulan | bulan + tahun, misalnya `Agustus 2026`; tersimpan sebagai `YYYY-MM` |
+| 7 | Total | angka — diketik biasa, tampil otomatis dengan pemisah ribuan |
+| 8 | Pembayaran | `Lunas` · `Belum` |
+| 9 | Pengiriman inv | `done` · `belum` |
+| 10 | Reminder 1 | `done` · `belum` |
+| 11 | Reminder 2 | `done` · `belum` |
+| 12 | Reminder 3 | `done` · `belum` |
+| 13 | Reminder 4 | `done` · `belum` |
 
-> Kolom ke-11 s/d 15 hanya punya dua nilai. Saat import, nilai apa pun yang berarti selesai
-> (`done`, `selesai`, `sudah`, `ya`, `1`, `ok`, `sent`) dibaca sebagai `done`; sisanya `belum`.
-Bulan Tagihan juga menerima tulisan bebas: `Agustus 2026`, `agu 26`, `8/2026`, `2026-08` → disimpan `2026-08`.
+Saat import, status dan pembayaran tidak case-sensitive. Format pembayaran lama `yes` diterjemahkan menjadi `Lunas`, sedangkan `no`/`free` menjadi `Belum`. Nilai reminder seperti `selesai`, `sudah`, `ya`, `1`, `ok`, atau `sent` diterjemahkan menjadi `done`; sisanya menjadi `belum`.
 
-**Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk
-menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import ·
-laporan PDF/HTML. Di tabel, badge `belum` bisa **diklik** untuk menandai `done` tanpa membuka form.
+Bulan menerima tulisan bebas: `Agustus 2026`, `agu 26`, `8/2026`, `2026-08` → disimpan `2026-08`.
+
+**Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import · laporan PDF/HTML. Di tabel, badge `belum` bisa **diklik** untuk menandai `done` tanpa membuka form.
 
 ### 🔧 Menambah / memindah / menghapus kolom
 Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
@@ -52,9 +48,7 @@ Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
 
 Tipe tersedia: `text` · `phone` · `longtext` · `select` · `currency` · `month` · `day` · `done` · `number`.
 
-> ⚠️ Menghapus field dari `server.js` menghentikan perawatannya; data lama field itu tetap
-> ada di `data/db.json` tetapi tidak ditampilkan lagi dan akan tertimpa nilai default saat
-> record diedit. Backup dulu lewat menu **💾 Backup & Restore** sebelum mengubah struktur.
+> ⚠️ Field lama `Infrastruktur` dan `Kelompok` tidak lagi ditampilkan di form, tabel, template import, atau laporan. Data lama yang masih menyimpan kedua properti tersebut tetap aman di backup JSON.
 
 ## 🔑 Akun Awal
 
@@ -81,27 +75,25 @@ tersedia di **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ## 📥 Format File Import (CSV / XLSX)
 
-Kolom header (urutan bebas, tidak case-sensitive):
+Kolom header mengikuti format file kolektor lama (urutan bebas, tidak case-sensitive):
 
 ```
-ID, Nama Pelanggan, No HP / WA, Status, Infrastruktur, Tagihan, Kelompok, Jumlah Tagihan
+ID, Customer, Status, Alamat Customer, Telepon Customer, Bulan, Total, Pembayaran, Pengiriman inv, Reminder 1, Reminder 2, Reminder 3, Reminder 4
 ```
 
-- `ID` **wajib diisi & unik** — ID mengikuti data import Anda (tidak dibuat otomatis oleh sistem).
-- Nilai kategori dinormalisasi otomatis (mis. `fiber` → `fiber optic`, `blok` → `blokir`).
-- Contoh baris:
+- `ID` **wajib diisi saat import** dan boleh digunakan kembali pada bulan yang berbeda.
+- Header lama seperti `Nama Pelanggan`, `No HP / WA`, `Telpon Customer`, `Bulan Tagihan`, `Jumlah Tagihan`, dan `Tagihan` tetap dikenali.
+- Nilai status/pembayaran dinormalisasi otomatis, misalnya `aktif` → `Aktif` dan `yes`/`lunas` → `Lunas`.
+- Contoh sesuai format data sebelumnya:
 
 ```csv
-ID,Nama Pelanggan,No HP / WA,Status,Infrastruktur,Tagihan,Kelompok,Jumlah Tagihan
-P-001,Rudi Hartono,081234567890,aktif,wireless,yes,pelanggan lancar,250000
-P-002,Siti Aminah,081298765432,blokir,fiber optic,no,blokir dulu baru bayar,0
+ID,Customer,Status,Alamat Customer,Telepon Customer,Bulan,Total,Pembayaran,Pengiriman inv,Reminder 1,Reminder 2,Reminder 3,Reminder 4
+PG000163,"(PG000163) PENGADILAN AGAMA SOLOK (Aktif)",Aktif,"JL. KAPT. BAHAR HAMID, KEL LAING, KEC. TJ. HARAPAN, KOTA SOLOK",085237571144,"Agustus 2026",14000000,Lunas,belum,belum,belum,belum,belum
 ```
 
-> Untuk tambah pelanggan manual, kolom ID bersifat opsional: jika diisi akan dipakai
-> (harus unik), jika dikosongkan sistem membuatkan ID otomatis.
+> Untuk tambah pelanggan manual, kolom ID bersifat opsional: jika diisi akan dipakai (harus unik), jika dikosongkan sistem membuatkan ID otomatis.
 
-> 💡 Template dapat diunduh langsung dari halaman **Kolektor → Import** atau dari
-> endpoint `/api/template.csv`.
+> 💡 Template dapat diunduh langsung dari halaman **Dashboard → Unduh Template Import** atau endpoint `/api/template.csv`.
 
 ## 🗂️ Struktur Proyek
 
