@@ -2,47 +2,35 @@
  * KolektorApp — Frontend SPA (vanilla JS)
  * ============================================================ */
 const OPTIONS = {
-  status: ['aktif', 'blokir', 'putus', 'cuti'],
-  infrastruktur: ['wireless', 'fiber optic'],
-  tagihan: ['yes', 'no', 'free'],
+  // Nilai internal tetap sederhana/lowercase agar data lama dan import lama tetap terbaca.
+  status: ['aktif', 'blokir', 'cuti', 'putus'],
+  pembayaran: ['lunas', 'belum'],
   done: ['belum', 'done'],
-  kelompok: [
-    'pelanggan lancar',
-    'minta invoice',
-    'butuh konfirmasi',
-    'blokir dulu baru bayar',
-    'bayar ke kantor',
-    'minta jemput',
-  ],
 };
 
 /* ---------- Konfigurasi form & kolom pelanggan ----------
- * SATU daftar untuk: urutan field di form input, kolom tabel data, dan header
- * template import CSV. Urutan array = urutan tampilan (rata/flat, tanpa bagian).
- *   key        : nama field di database
- *   label      : judul di form, tabel, dan template CSV
- *   type       : text | phone | longtext | select | currency | month | day | done
- *                (done → hanya dua pilihan: done / belum)
- *   size       : 'full' = selebar 2 kolom, 'half' = setengah baris
- *   required   : wajib diisi
- * Menghapus kolom dari semuanya: hapus barisnya di sini DAN di server.js.
+ * Satu daftar ini dipakai untuk: form input, tabel data, dan template import.
+ * Urutannya sengaja mengikuti format data kolektor yang sudah dipakai sebelumnya:
+ * ID, Customer, Status, Alamat Customer, Telepon Customer, Bulan, Total,
+ * Pembayaran, Pengiriman inv, Reminder 1–4.
+ *
+ * Key database lama dipertahankan (nama, alamat, noHp, dst.) agar data yang sudah
+ * ada tidak perlu dipindah. Label di bawah adalah label yang dilihat kolektor.
  */
 const PELANGGAN_FIELDS = [
-  { key: 'id',            label: 'ID',                type: 'text',     size: 'half', placeholder: 'kosongkan → otomatis', hint: 'diisi otomatis bila kosong' },
-  { key: 'nama',          label: 'Nama Pelanggan',    type: 'text',     size: 'full', required: true, placeholder: 'Nama lengkap' },
-  { key: 'alamat',        label: 'Alamat',            type: 'longtext', size: 'full', placeholder: 'Jalan, No. Rumah, RT/RW, Desa' },
-  { key: 'noHp',          label: 'No HP / WA',        type: 'phone',    size: 'half', placeholder: '08xxxxxxxxxx', inputmode: 'tel', hint: 'minimal 8 angka' },
-  { key: 'status',        label: 'Status',            type: 'select', options: OPTIONS.status,        size: 'half', def: 'aktif' },
-  { key: 'infrastruktur', label: 'Infrastruktur',     type: 'select', options: OPTIONS.infrastruktur, size: 'half', def: 'wireless' },
-  { key: 'tagihan',       label: 'Tagihan',            type: 'select', options: OPTIONS.tagihan,       size: 'half', def: 'no' },
-  { key: 'kelompok',      label: 'Kelompok',          type: 'select', options: OPTIONS.kelompok,      size: 'half', def: 'pelanggan lancar' },
-  { key: 'jumlahTagihan', label: 'Jumlah Tagihan',    type: 'currency', size: 'half', def: 0 },
-  { key: 'bulanTagihan',  label: 'Bulan Tagihan',     type: 'month',    size: 'half', def: '', placeholder: 'Agustus 2026' },
-  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',     size: 'half', def: 'belum' },
-  { key: 'reminder1',     label: 'Reminder1', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder2',     label: 'Reminder2', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder3',     label: 'Reminder3', type: 'done', size: 'half', def: 'belum' },
-  { key: 'reminder4',     label: 'Reminder4', type: 'done', size: 'half', def: 'belum' },
+  { key: 'id',            label: 'ID',                type: 'text',     size: 'half', placeholder: 'contoh: PG000163', hint: 'boleh dikosongkan saat input manual' },
+  { key: 'nama',          label: 'Customer',          type: 'text',     size: 'full', required: true, placeholder: 'Nama customer' },
+  { key: 'status',        label: 'Status',            type: 'select', options: OPTIONS.status,     size: 'half', def: 'aktif' },
+  { key: 'alamat',        label: 'Alamat Customer',   type: 'longtext', size: 'full', placeholder: 'Alamat lengkap customer' },
+  { key: 'noHp',          label: 'Telepon Customer',  type: 'phone',   size: 'half', placeholder: '08xxxxxxxxxx', inputmode: 'tel', hint: 'minimal 8 angka' },
+  { key: 'bulanTagihan',  label: 'Bulan',             type: 'month',   size: 'half', def: '', placeholder: 'Agustus 2026' },
+  { key: 'jumlahTagihan', label: 'Total',             type: 'currency', size: 'half', def: 0 },
+  { key: 'tagihan',       label: 'Pembayaran',        type: 'select', options: OPTIONS.pembayaran, size: 'half', def: 'belum' },
+  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done',    size: 'half', def: 'belum' },
+  { key: 'reminder1',     label: 'Reminder 1',        type: 'done',    size: 'half', def: 'belum' },
+  { key: 'reminder2',     label: 'Reminder 2',        type: 'done',    size: 'half', def: 'belum' },
+  { key: 'reminder3',     label: 'Reminder 3',        type: 'done',    size: 'half', def: 'belum' },
+  { key: 'reminder4',     label: 'Reminder 4',        type: 'done',    size: 'half', def: 'belum' },
 ];
 
 // Header template import CSV — diambil otomatis dari urutan di atas
@@ -218,12 +206,33 @@ async function copyText(text) {
 
 // Isi template import (di-generate di sisi klien agar selalu bisa diakses, bahkan tanpa unduhan).
 function templateCSV() {
+  // Contoh dibuat sama dengan format file kolektor yang sudah digunakan sebelumnya.
   const rows = [
-    ['P-001', 'Rudi Hartono', 'Jl. Merdeka No. 12, RT 02/RW 03', '081234567890', 'aktif', 'wireless', 'yes', 'pelanggan lancar', '250000', '2026-08', 'done', 'done', 'belum', 'belum', 'belum'],
-    ['P-002', 'Siti Aminah', 'Perum Griya Indah B-7', '081298765432', 'blokir', 'fiber optic', 'no', 'blokir dulu baru bayar', '0', '2026-07', 'belum', 'belum', 'belum', 'belum', 'belum'],
+    {
+      id: 'PG000163',
+      nama: '(PG000163) PENGADILAN AGAMA SOLOK (Aktif)',
+      status: 'aktif',
+      alamat: 'JL. KAPT. BAHAR HAMID, KEL LAING, KEC. TJ. HARAPAN, KOTA SOLOK',
+      noHp: '085237571144',
+      bulanTagihan: '2026-08',
+      jumlahTagihan: '14000000',
+      tagihan: 'lunas',
+      pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+    },
+    {
+      id: 'PG000164',
+      nama: '(PG000164) CONTOH CUSTOMER (Aktif)',
+      status: 'aktif',
+      alamat: 'Alamat contoh customer',
+      noHp: '081234567890',
+      bulanTagihan: '2026-08',
+      jumlahTagihan: '250000',
+      tagihan: 'belum',
+      pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
+    },
   ];
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
-  const lines = [IMPORT_LABELS.join(','), ...rows.map((r) => r.map(csvCell).join(','))];
+  const lines = [IMPORT_LABELS.join(','), ...rows.map((row) => PELANGGAN_FIELDS.map((f) => csvCell(row[f.key] == null ? '' : row[f.key])).join(','))];
   return '\uFEFF' + lines.join('\n');
 }
 
@@ -255,16 +264,25 @@ function downloadTemplate() {
 }
 
 /* ---------- Badges ---------- */
-const statusBadge = (s) => `<span class="badge b-${esc(s)}"><span class="dot"></span>${esc(s)}</span>`;
-const infraBadge = (s) => {
-  const cls = s === 'fiber optic' ? 'fiber-optic' : s;
-  return `<span class="badge b-${cls}"><span class="dot"></span>${esc(s)}</span>`;
+const STATUS_LABELS = { aktif: 'Aktif', blokir: 'Blokir', cuti: 'Cuti', putus: 'Putus' };
+const PAYMENT_LABELS = { lunas: 'Lunas', belum: 'Belum', yes: 'Lunas', no: 'Belum', free: 'Belum' };
+const displayStatus = (v) => STATUS_LABELS[String(v || '').toLowerCase()] || v || '-';
+const displayPayment = (v) => PAYMENT_LABELS[String(v || '').toLowerCase()] || v || 'Belum';
+const statusBadge = (s) => `<span class="badge b-${esc(String(s || '').toLowerCase())}"><span class="dot"></span>${esc(displayStatus(s))}</span>`;
+const paymentBadge = (s) => {
+  const key = String(s || '').toLowerCase();
+  const cls = key === 'lunas' || key === 'yes' ? 'lunas' : 'belum';
+  return `<span class="badge b-${cls}"><span class="dot"></span>${esc(displayPayment(s))}</span>`;
 };
-const tagihanBadge = (s) => `<span class="badge b-${esc(s)}"><span class="dot"></span>${esc(s)}</span>`;
-const kelompokBadge = (s) => {
-  const i = OPTIONS.kelompok.indexOf(s);
-  return `<span class="badge b-kelompok${i < 0 ? 0 : i}"><span class="dot"></span>${esc(s)}</span>`;
-};
+// Alias ini dipertahankan untuk pemanggil lama.
+const tagihanBadge = paymentBadge;
+
+function optionLabel(value) {
+  const key = String(value || '').toLowerCase();
+  if (STATUS_LABELS[key]) return STATUS_LABELS[key];
+  if (PAYMENT_LABELS[key]) return PAYMENT_LABELS[key];
+  return value;
+}
 
 /* ---------- Modal helpers ---------- */
 function openModal(html, size = '') {
@@ -588,21 +606,17 @@ async function renderDashboard() {
           <button class="btn btn-outline" onclick="downloadTemplate()">📥 Unduh Template Import</button>
         </div>
       </div></div>` : ''}
-      <div class="col-4"><div class="card card-pad">
-        <div class="card-head"><div><div class="card-title">Status Pelanggan</div><div class="card-sub">Distribusi aktif / blokir / putus / cuti</div></div></div>
+      <div class="col-6"><div class="card card-pad">
+        <div class="card-head"><div><div class="card-title">Status Pelanggan</div><div class="card-sub">Distribusi Aktif / Blokir / Cuti / Putus</div></div></div>
         <div class="chart-box"><canvas id="ch-status"></canvas></div>
       </div></div>
+      <div class="col-6"><div class="card card-pad">
+        <div class="card-head"><div><div class="card-title">Pembayaran</div><div class="card-sub">Lunas / Belum</div></div></div>
+        <div class="chart-box"><canvas id="ch-tagihan"></canvas></div>
+      </div></div>
       <div class="col-8"><div class="card card-pad">
-        <div class="card-head"><div><div class="card-title">Kelompok Pelanggan</div><div class="card-sub">Kategori penanganan pelanggan</div></div></div>
-        <div class="chart-box"><canvas id="ch-kelompok"></canvas></div>
-      </div></div>
-      <div class="col-4"><div class="card card-pad">
-        <div class="card-head"><div><div class="card-title">Infrastruktur</div><div class="card-sub">Wireless vs fiber optic</div></div></div>
-        <div class="chart-box short"><canvas id="ch-infra"></canvas></div>
-      </div></div>
-      <div class="col-4"><div class="card card-pad">
-        <div class="card-head"><div><div class="card-title">Status Tagihan</div><div class="card-sub">yes / no / free</div></div></div>
-        <div class="chart-box short"><canvas id="ch-tagihan"></canvas></div>
+        <div class="card-head"><div><div class="card-title">Progress Pengiriman &amp; Reminder</div><div class="card-sub">Jumlah data yang sudah ditandai done</div></div></div>
+        <div class="chart-box"><canvas id="ch-reminders"></canvas></div>
       </div></div>
       <div class="col-4"><div class="card card-pad">
         <div class="card-head"><div><div class="card-title">Pesan Terakhir</div><div class="card-sub">Riwayat kirim pesan WA</div></div></div>
@@ -636,10 +650,9 @@ async function renderDashboard() {
     </div>`;
 
   // charts
-  renderChart('ch-status', doughnut(d.statusCounts.map((x) => x.label), d.statusCounts.map((x) => x.value), ['#10b981', '#ef4444', '#64748b', '#f59e0b']));
-  renderChart('ch-kelompok', bar(d.kelompokCounts.map((x) => x.label), d.kelompokCounts.map((x) => x.value), PALETTE, true));
-  renderChart('ch-infra', doughnut(d.infraCounts.map((x) => x.label), d.infraCounts.map((x) => x.value), ['#14b8a6', '#8b5cf6']));
-  renderChart('ch-tagihan', doughnut(d.tagihanCounts.map((x) => x.label), d.tagihanCounts.map((x) => x.value), ['#10b981', '#ef4444', '#3b82f6']));
+  renderChart('ch-status', doughnut(d.statusCounts.map((x) => optionLabel(x.label)), d.statusCounts.map((x) => x.value), ['#10b981', '#ef4444', '#f59e0b', '#64748b']));
+  renderChart('ch-tagihan', doughnut(d.tagihanCounts.map((x) => optionLabel(x.label)), d.tagihanCounts.map((x) => x.value), ['#10b981', '#ef4444']));
+  renderChart('ch-reminders', bar(d.reminderCounts.map((x) => x.label), d.reminderCounts.map((x) => x.value), PALETTE, true));
   if (isAdmin) {
     renderChart('ch-perkolektor', bar(d.perKolektor.map((x) => x.nama), d.perKolektor.map((x) => x.totalTagihan), PALETTE));
   }
@@ -778,7 +791,7 @@ async function openImportModal(preselectId) {
         <select class="input" id="imp-kolektor">${opts}</select></div>
       <div class="field" style="margin-bottom:14px"><label>Bulan Default <span class="req">*</span></label>
         <input class="input" type="month" id="imp-bulan" value="${state.pelFilter.bulan !== 'ALL' ? esc(state.pelFilter.bulan) : currentMonthValue()}" />
-        <div class="fld-hint">Dipakai untuk baris yang kolom Bulan Tagihan-nya kosong.</div></div>
+        <div class="fld-hint">Dipakai untuk baris yang kolom Bulan-nya kosong.</div></div>
       <div class="field" style="margin-bottom:6px"><label>File (CSV / XLSX) <span class="req">*</span></label>
         <input class="input" type="file" id="imp-file" accept=".csv,.xlsx,.xls" /></div>
       <div class="hint" style="margin-bottom:12px">
@@ -865,8 +878,7 @@ async function renderPelanggan(opts = {}) {
 
 /* ---------- Kolom tabel (dikendalikan PELANGGAN_FIELDS + preferensi user) ---------- */
 const COL_KEY = 'kolektorapp.pelColumns.v1';
-const DEFAULT_ON = ['id', 'nama', 'alamat', 'noHp', 'status', 'infrastruktur', 'tagihan', 'kelompok',
-  'jumlahTagihan', 'bulanTagihan', 'pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'];
+const DEFAULT_ON = PELANGGAN_FIELDS.map((field) => field.key);
 
 function visibleColumns() {
   let saved = null;
@@ -927,13 +939,13 @@ function toggleColumnMenu() {
   }, 0);
 }
 
-const BULAN_PENDEK = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const BULAN_PENDEK = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 function fmtBulanTagihan(v) {
   const m = String(v || '').match(/^(\d{4})-(\d{1,2})/);
   if (!m) return v || '-';
   const i = Number(m[2]) - 1;
   if (i < 0 || i > 11) return v;
-  return BULAN_PENDEK[i].toUpperCase() + ' ' + m[1];
+  return BULAN_PENDEK[i] + ' ' + m[1];
 }
 
 function renderCell(f, p) {
@@ -942,9 +954,7 @@ function renderCell(f, p) {
     case 'id': return `<code>${esc(v)}</code>`;
     case 'nama': return `<strong>${esc(v)}</strong>`;
     case 'status': return statusBadge(v);
-    case 'infrastruktur': return infraBadge(v);
-    case 'tagihan': return tagihanBadge(v);
-    case 'kelompok': return kelompokBadge(v);
+    case 'tagihan': return paymentBadge(v);
     case 'jumlahTagihan': return `<strong>${fmtRp(v)}</strong>`;
     case 'bulanTagihan': return v ? `<strong>${esc(fmtBulanTagihan(v))}</strong>` : '-';
     default:
@@ -1050,7 +1060,7 @@ function renderFormField(f, p, isAdmin) {
   const val = p && p[f.key] !== undefined && p[f.key] !== null ? p[f.key] : (f.key === 'bulanTagihan' && state.pelFilter.bulan !== 'ALL' ? state.pelFilter.bulan : (f.def === undefined ? '' : f.def));
   switch (f.type) {
     case 'select': {
-      const opts = (f.options || []).map((o) => `<option value="${esc(o)}" ${String(o) === String(val) ? 'selected' : ''}>${esc(o)}</option>`).join('');
+      const opts = (f.options || []).map((o) => `<option value="${esc(o)}" ${String(o) === String(val) ? 'selected' : ''}>${esc(optionLabel(o))}</option>`).join('');
       return `<div class="field ${f.size === 'full' ? 'full' : ''}">${label}<select class="${cls}" id="${id}">${opts}</select></div>`;
     }
     case 'longtext':
@@ -1121,7 +1131,7 @@ function validateFormClient(isAdmin) {
   });
   if (missing.length) return 'Belum diisi: ' + missing.join(', ') + '.';
   const hp = document.getElementById(fieldInput('noHp'));
-  if (hp && hp.value.replace(/\D/g, '').length < 8) return 'No HP/WA minimal 8 angka.';
+  if (hp && hp.value.replace(/\D/g, '').length < 8) return 'Telepon Customer minimal 8 angka.';
   if (isAdmin && !state.kolektor.length) return 'Belum ada kolektor — tambahkan kolektor dulu.';
   return '';
 }
@@ -1237,7 +1247,7 @@ function openMessageModal(id) {
   const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
   if (!p) return;
   const templates = [
-    { label: 'Konfirmasi Tagihan', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait tagihan internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
+    { label: 'Konfirmasi Pembayaran', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait pembayaran internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
     { label: 'Cek Kendala Layanan', text: `Halo Bpk/Ibu ${p.nama}, ini dari tim kolektor. Apakah ada kendala pada layanan internet Anda? Silakan balas pesan ini. Terima kasih.` },
     { label: 'Pengumuman Tagihan Bulanan', text: tagihanBulananTemplate() },
   ];
@@ -1247,10 +1257,10 @@ function openMessageModal(id) {
       <div id="msg-error" class="form-error hidden"></div>
       <div class="list-plain" style="margin-bottom:14px">
         <li><span class="dim">Nama</span><strong>${esc(p.nama)}</strong></li>
-        <li><span class="dim">No HP / WA</span><strong>${esc(p.noHp)}</strong></li>
+        <li><span class="dim">Telepon Customer</span><strong>${esc(p.noHp)}</strong></li>
         ${p.alamat ? `<li><span class="dim">Alamat</span><span>${esc(p.alamat)}</span></li>` : ''}
-        <li><span class="dim">Kelompok</span>${kelompokBadge(p.kelompok)}</li>
-        <li><span class="dim">Bulan Tagihan</span><span>${esc(fmtBulanTagihan(p.bulanTagihan))}</span></li>
+        <li><span class="dim">Pembayaran</span>${paymentBadge(p.tagihan)}</li>
+        <li><span class="dim">Bulan</span><span>${esc(fmtBulanTagihan(p.bulanTagihan))}</span></li>
       </div>
       <div class="field"><label>Pesan</label>
         <textarea class="input" id="msg-teks" rows="8" placeholder="Tulis pesan untuk pelanggan…">${esc(templates[0].text)}</textarea></div>

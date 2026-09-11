@@ -21,9 +21,11 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 // ---------------------------------------------------------------------------
 // Konstanta opsi (harus sinkron dengan frontend)
 // ---------------------------------------------------------------------------
-const STATUS_OPTIONS = ['aktif', 'blokir', 'putus', 'cuti'];
+const STATUS_OPTIONS = ['aktif', 'blokir', 'cuti', 'putus'];
 const INFRA_OPTIONS = ['wireless', 'fiber optic'];
-const TAGIHAN_OPTIONS = ['yes', 'no', 'free'];
+// Format pembayaran lama (yes/no/free) dinormalisasi ke dua pilihan baru ini.
+const PAYMENT_OPTIONS = ['lunas', 'belum'];
+const TAGIHAN_OPTIONS = PAYMENT_OPTIONS;
 const DONE_OPTIONS = ['belum', 'done'];   // dipakai: Pengiriman inv & Reminder1–4
 const KELOMPOK_OPTIONS = [
   'pelanggan lancar',
@@ -44,21 +46,19 @@ const KELOMPOK_OPTIONS = [
 // Untuk memindah/menambah urutan field, cukup edit array ini.
 // ---------------------------------------------------------------------------
 const PELANGGAN_FIELDS = [
-  { key: 'id',        label: 'ID',               type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
-  { key: 'nama',      label: 'Nama Pelanggan',   type: 'text', required: true, aliases: ['namapelanggan', 'pelanggan', 'nama'] },
-  { key: 'alamat',    label: 'Alamat',           type: 'text', aliases: ['alamat', 'alamatpelanggan', 'alm', 'almat', 'address', 'lokasi', 'patok'] },
-  { key: 'noHp',      label: 'No HP / WA',       type: 'phone', aliases: ['nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'nomor'] },
-  { key: 'status',    label: 'Status',           type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
-  { key: 'infrastruktur', label: 'Infrastruktur', type: 'select', options: INFRA_OPTIONS, aliases: ['infrastruktur', 'infra', 'jaringan'] },
-  { key: 'tagihan',   label: 'Tagihan',          type: 'select', options: TAGIHAN_OPTIONS, aliases: ['tagihan', 'statustagihan'] },
-  { key: 'kelompok',  label: 'Kelompok',         type: 'select', options: KELOMPOK_OPTIONS, aliases: ['kelompok', 'kategori', 'grup'] },
-  { key: 'jumlahTagihan', label: 'Jumlah Tagihan', type: 'currency', def: 0, aliases: ['jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
-  { key: 'bulanTagihan', label: 'Bulan Tagihan', type: 'month', def: '', aliases: ['bulan tagihan', 'bulantagihan', 'bulan', 'periode', 'period', 'tagihan bulan', 'billing month', 'billingmonth'] },
-  { key: 'pengirimanInv', label: 'Pengiriman inv', type: 'done', def: 'belum', aliases: ['pengirimaninv', 'kiriminv', 'kirim', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1'] },
-  { key: 'reminder1', label: 'Reminder1', type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
-  { key: 'reminder2', label: 'Reminder2', type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
-  { key: 'reminder3', label: 'Reminder3', type: 'done', def: 'belum', aliases: ['reminder3', 'reminder 3', 'rem3', 'pengingat3'] },
-  { key: 'reminder4', label: 'Reminder4', type: 'done', def: 'belum', aliases: ['reminder4', 'reminder 4', 'rem4', 'pengingat4'] },
+  { key: 'id',            label: 'ID',                type: 'text', virtual: true, aliases: ['idpelanggan', 'kode', 'no'] },
+  { key: 'nama',          label: 'Customer',          type: 'text', required: true, aliases: ['customer', 'customers', 'nama pelanggan', 'namapelanggan', 'pelanggan', 'nama'] },
+  { key: 'status',        label: 'Status',            type: 'select', options: STATUS_OPTIONS, aliases: ['status', 'statuspelanggan'] },
+  { key: 'alamat',        label: 'Alamat Customer',   type: 'longtext', aliases: ['alamat customer', 'alamatcustomer', 'alamat', 'alamatpelanggan', 'alm', 'almat', 'address', 'lokasi', 'patok'] },
+  { key: 'noHp',          label: 'Telepon Customer',  type: 'phone', aliases: ['telepon customer', 'teleponcustomer', 'telpon customer', 'telponcustomer', 'no hp / wa', 'nohp', 'nohpwa', 'hp', 'wa', 'whatsapp', 'notelp', 'telepon', 'telpon', 'nomor'] },
+  { key: 'bulanTagihan',  label: 'Bulan',             type: 'month', def: '', aliases: ['bulan', 'bulan tagihan', 'bulantagihan', 'periode', 'period', 'tagihan bulan', 'billing month', 'billingmonth'] },
+  { key: 'jumlahTagihan', label: 'Total',            type: 'currency', def: 0, aliases: ['total', 'jumlah tagihan', 'jumlahtagihan', 'jumlah', 'nominal', 'nominaltagihan', 'harga', 'biaya'] },
+  { key: 'tagihan',       label: 'Pembayaran',        type: 'select', options: PAYMENT_OPTIONS, def: 'belum', aliases: ['pembayaran', 'status pembayaran', 'statuspembayaran', 'tagihan', 'statustagihan'] },
+  { key: 'pengirimanInv', label: 'Pengiriman inv',    type: 'done', def: 'belum', aliases: ['pengiriman inv', 'pengirimaninv', 'kirim inv', 'kiriminv', 'kirim invoice', 'pengiriman invoice', 'inv', 'inv1', 'invoice'] },
+  { key: 'reminder1',     label: 'Reminder 1',        type: 'done', def: 'belum', aliases: ['reminder1', 'reminder 1', 'rem1', 'reminder', 'pengingat1'] },
+  { key: 'reminder2',     label: 'Reminder 2',        type: 'done', def: 'belum', aliases: ['reminder2', 'reminder 2', 'rem2', 'pengingat2'] },
+  { key: 'reminder3',     label: 'Reminder 3',        type: 'done', def: 'belum', aliases: ['reminder3', 'reminder 3', 'rem3', 'pengingat3'] },
+  { key: 'reminder4',     label: 'Reminder 4',        type: 'done', def: 'belum', aliases: ['reminder4', 'reminder 4', 'rem4', 'pengingat4'] },
 ];
 
 const FIELD_BY_KEY = Object.fromEntries(PELANGGAN_FIELDS.map((f) => [f.key, f]));
@@ -151,10 +151,10 @@ function normInfra(v) {
 }
 
 function normTagihan(v) {
-  const s = String(v).toLowerCase().trim();
-  if (['yes', 'y', 'ya', '1', 'ada', 'aktif'].includes(s)) return 'yes';
-  if (['no', 'n', 'tidak', '0', 'tdk'].includes(s)) return 'no';
-  if (['free', 'gratis', 'f'].includes(s)) return 'free';
+  const s = String(v == null ? '' : v).toLowerCase().trim();
+  // Format lama yes / no / free tetap diterima saat import dan restore.
+  if (['lunas', 'yes', 'y', 'ya', '1', 'ada', 'aktif', 'paid', 'sudah bayar', 'sudah dibayar'].includes(s)) return 'lunas';
+  if (['belum', 'no', 'n', 'tidak', '0', 'tdk', 'free', 'gratis', 'f', 'unpaid', 'belum bayar'].includes(s)) return 'belum';
   return null;
 }
 
@@ -301,7 +301,42 @@ function fmtMonthID(iso) {
   if (!m) return String(iso);
   const idx = Number(m[2]) - 1;
   if (idx < 0 || idx > 11) return String(iso);
-  return BULAN_LABEL[idx].toUpperCase() + ' ' + m[1];
+  return BULAN_LABEL[idx] + ' ' + m[1];
+}
+
+// Migrasi ringan agar data dari versi/aplikasi kolektor lama langsung cocok dengan
+// format baru. Kolom lama tetap dibiarkan di JSON sebagai cadangan, tetapi kolom
+// yang dipakai aplikasi dinormalisasi ke key internal yang sama.
+function migratePelangganSchema(target) {
+  let changed = false;
+  (target.pelanggan || []).forEach((p) => {
+    const copy = (key, aliases) => {
+      if ((p[key] === undefined || p[key] === null || p[key] === '') && aliases.some((a) => p[a] !== undefined && p[a] !== null && p[a] !== '')) {
+        p[key] = p[aliases.find((a) => p[a] !== undefined && p[a] !== null && p[a] !== '')];
+        changed = true;
+      }
+    };
+    copy('nama', ['customer', 'customers']);
+    copy('alamat', ['alamatCustomer', 'alamat_customer']);
+    copy('noHp', ['teleponCustomer', 'telponCustomer', 'telepon_customer']);
+    copy('bulanTagihan', ['bulan']);
+    copy('jumlahTagihan', ['total']);
+    copy('tagihan', ['pembayaran']);
+
+    const status = normStatus(p.status);
+    if (status && status !== p.status) { p.status = status; changed = true; }
+    const payment = normTagihan(p.tagihan);
+    if (payment && payment !== p.tagihan) { p.tagihan = payment; changed = true; }
+    const month = normMonth(p.bulanTagihan);
+    if (month !== (p.bulanTagihan || '')) { p.bulanTagihan = month; changed = true; }
+    const total = parseNumber(p.jumlahTagihan);
+    if (total !== Number(p.jumlahTagihan || 0)) { p.jumlahTagihan = total; changed = true; }
+    ['pengirimanInv', 'reminder1', 'reminder2', 'reminder3', 'reminder4'].forEach((key) => {
+      const done = normDone(p[key], 'belum');
+      if (done !== (p[key] || 'belum')) { p[key] = done; changed = true; }
+    });
+  });
+  return changed;
 }
 
 // Tanggal jatuh tempo: 1..28 (aman untuk semua bulan)
@@ -311,6 +346,8 @@ function normDay(v) {
   return Math.min(28, Math.max(1, n));
 }
 
+if (migratePelangganSchema(db)) saveDB(db);
+
 function publicUser(u) {
   return { id: u.id, username: u.username, name: u.name, role: u.role };
 }
@@ -319,6 +356,17 @@ function escHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const STATUS_LABELS = { aktif: 'Aktif', blokir: 'Blokir', cuti: 'Cuti', putus: 'Putus' };
+const PAYMENT_LABELS = { lunas: 'Lunas', belum: 'Belum', yes: 'Lunas', no: 'Belum', free: 'Belum' };
+function statusLabel(value) {
+  const key = String(value || '').toLowerCase();
+  return STATUS_LABELS[key] || value || '-';
+}
+function paymentLabel(value) {
+  const key = String(value || '').toLowerCase();
+  return PAYMENT_LABELS[key] || value || 'Belum';
 }
 
 // ---------------------------------------------------------------------------
@@ -366,10 +414,10 @@ function seedDB() {
 
     const infrastruktur = pick(INFRA_OPTIONS);
 
-    let tagihan = 'no';
-    if (status === 'aktif') tagihan = rnd() < 0.85 ? 'yes' : 'no';
-    else if (status === 'cuti') tagihan = rnd() < 0.5 ? 'free' : 'no';
-    else if (status === 'blokir') tagihan = rnd() < 0.7 ? 'no' : 'yes';
+    let tagihan = 'belum';
+    if (status === 'aktif') tagihan = rnd() < 0.85 ? 'lunas' : 'belum';
+    else if (status === 'cuti') tagihan = 'belum';
+    else if (status === 'blokir') tagihan = rnd() < 0.3 ? 'lunas' : 'belum';
 
     let kelompok = 'pelanggan lancar';
     if (status === 'blokir') kelompok = pick(['blokir dulu baru bayar', 'butuh konfirmasi', 'minta invoice']);
@@ -378,15 +426,15 @@ function seedDB() {
     else kelompok = pick(['pelanggan lancar', 'minta invoice', 'minta jemput', 'bayar ke kantor', 'butuh konfirmasi']);
 
     let jumlahTagihan = 0;
-    if (tagihan === 'yes') jumlahTagihan = Math.round((150000 + rnd() * 400000) / 1000) * 1000;
+    if (tagihan === 'lunas') jumlahTagihan = Math.round((150000 + rnd() * 400000) / 1000) * 1000;
     else if (tagihan === 'free') jumlahTagihan = 0;
 
     const noHp = '08' + String(1200000000 + Math.floor(rnd() * 879999999)).padStart(10, '0');
     const done = (p) => (rnd() < p ? 'done' : 'belum');
     const alamat = 'Jl. ' + pick(['Merdeka', 'Melati', 'Anggrek', 'Kenanga', 'Dahlia', 'Mawar', 'Flamboyan', 'Cempaka'])
       + ' No. ' + (1 + Math.floor(rnd() * 80)) + ', RT ' + String(1 + Math.floor(rnd() * 9)).padStart(2, '0');
-    const pengirimanInv = tagihan === 'yes' ? done(0.55) : 'belum';
-    const jmlReminder = tagihan === 'yes' ? Math.floor(rnd() * 5) : Math.floor(rnd() * 3);
+    const pengirimanInv = tagihan === 'lunas' ? done(0.55) : 'belum';
+    const jmlReminder = tagihan === 'lunas' ? Math.floor(rnd() * 5) : Math.floor(rnd() * 3);
     pelanggan.push({
       id: 'PLG-' + String(i + 1).padStart(4, '0'),
       kolektorId: kolektor.id,
@@ -667,7 +715,7 @@ function validatePelanggan(body) {
         let val;
         if (f.options === STATUS_OPTIONS) val = normStatus(raw) || f.def || 'aktif';
         else if (f.options === INFRA_OPTIONS) val = normInfra(raw) || f.def || 'wireless';
-        else if (f.options === TAGIHAN_OPTIONS) val = normTagihan(raw) || f.def || 'no';
+        else if (f.options === TAGIHAN_OPTIONS) val = normTagihan(raw) || f.def || 'belum';
         else if (f.options === KELOMPOK_OPTIONS) val = normKelompok(raw) || f.def || 'pelanggan lancar';
         else val = f.options.includes(String(raw).toLowerCase().trim()) ? String(raw).toLowerCase().trim() : (f.def || f.options[0]);
         data[f.key] = val;
@@ -675,7 +723,7 @@ function validatePelanggan(body) {
       }
       case 'phone': {
         const ph = normPhone(raw);
-        if (ph && ph.replace(/\D/g, '').length < 8) return { error: 'No HP/WA tidak valid — minimal 8 angka.' };
+        if (ph && ph.replace(/\D/g, '').length < 8) return { error: 'Telepon Customer tidak valid — minimal 8 angka.' };
         data[f.key] = ph;
         break;
       }
@@ -824,6 +872,8 @@ app.post('/api/restore', requireAuth, requireAdmin, upload.single('file'), (req,
   db = parsed;
   if (!db.meta || typeof db.meta !== 'object') db.meta = {};
   if (!Array.isArray(db.pesan)) db.pesan = [];
+  ensureRecordIds(db.pelanggan);
+  migratePelangganSchema(db);
   // hitung ulang counter ID otomatis agar tidak bentrok
   const maxSeq = (db.pelanggan || []).reduce((m, p) => {
     const mt = /^PLG-(\d+)$/.exec(String(p.id || ''));
@@ -906,14 +956,14 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
       if (canon) mapped[canon] = raw[key];
     });
     if (!mapped.nama && !mapped.noHp) {
-      errors.push(`Baris ${i + 2}: tidak ada kolom nama/no HP yang dikenali.`);
+      errors.push(`Baris ${i + 2}: tidak ada kolom Customer/Telepon Customer yang dikenali.`);
       return;
     }
     const nama = String(mapped.nama || '').trim();
     const noHp = String(mapped.noHp || '').trim();
     if (!nama && !noHp) return; // baris kosong
-    if (!nama) { errors.push(`Baris ${i + 2}: nama kosong.`); return; }
-    if (!noHp) { errors.push(`Baris ${i + 2}: no HP kosong.`); return; }
+    if (!nama) { errors.push(`Baris ${i + 2}: Customer kosong.`); return; }
+    if (!noHp) { errors.push(`Baris ${i + 2}: Telepon Customer kosong.`); return; }
 
     // ID mengikuti data import (tidak dibuat otomatis oleh sistem)
     const id = (mapped.id === null || mapped.id === undefined) ? '' : String(mapped.id).trim();
@@ -921,7 +971,7 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
       errors.push(`Baris ${i + 2}: ID kosong — baris dilewati (ID harus diisi sesuai data Anda).`);
       return;
     }
-    // Bila kolom Bulan Tagihan kosong, gunakan periode yang dipilih di dialog import.
+    // Bila kolom Bulan kosong, gunakan periode yang dipilih di dialog import.
     if (!mapped.bulanTagihan && defaultBulan) mapped.bulanTagihan = defaultBulan;
 
     // Validasi + normalisasi memakai aturan yang sama dengan form input
@@ -947,15 +997,16 @@ app.post('/api/import', requireAuth, requireAdmin, upload.single('file'), (req, 
 // sama dengan field yang ada di form input.
 function templateRows() {
   const contoh = {
-    id: 'P-001', nama: 'Rudi Hartono', alamat: 'Jl. Merdeka No. 12, RT 02/RW 03',
-    noHp: '081234567890', status: 'aktif', infrastruktur: 'wireless', tagihan: 'yes',
-    kelompok: 'pelanggan lancar', jumlahTagihan: '250000', bulanTagihan: '2026-08',
+    id: 'PG000163', nama: '(PG000163) PENGADILAN AGAMA SOLOK (Aktif)',
+    alamat: 'JL. KAPT. BAHAR HAMID, KEL LAING, KEC. TJ. HARAPAN, KOTA SOLOK',
+    noHp: '085237571144', status: 'aktif', tagihan: 'lunas',
+    jumlahTagihan: '14000000', bulanTagihan: '2026-08',
     pengirimanInv: 'done', reminder1: 'done', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const contoh2 = {
-    id: 'P-002', nama: 'Siti Aminah', alamat: 'Perum Griya Indah B-7',
-    noHp: '081298765432', status: 'blokir', infrastruktur: 'fiber optic', tagihan: 'no',
-    kelompok: 'blokir dulu baru bayar', jumlahTagihan: '0', bulanTagihan: '2026-07',
+    id: 'PG000164', nama: '(PG000164) CONTOH CUSTOMER (Aktif)', alamat: 'Alamat contoh customer',
+    noHp: '081234567890', status: 'aktif', tagihan: 'belum',
+    jumlahTagihan: '250000', bulanTagihan: '2026-08',
     pengirimanInv: 'belum', reminder1: 'belum', reminder2: 'belum', reminder3: 'belum', reminder4: 'belum',
   };
   const csvCell = (s) => (/[",\n;]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
@@ -995,8 +1046,16 @@ function aggregate(list) {
     putus: count((p) => p.status === 'putus'),
     cuti: count((p) => p.status === 'cuti'),
     statusCounts: STATUS_OPTIONS.map((s) => ({ label: s, value: count((p) => p.status === s) })),
-    infraCounts: INFRA_OPTIONS.map((s) => ({ label: s, value: count((p) => p.infrastruktur === s) })),
     tagihanCounts: TAGIHAN_OPTIONS.map((s) => ({ label: s, value: count((p) => p.tagihan === s) })),
+    reminderCounts: [
+      ['Pengiriman inv', 'pengirimanInv'],
+      ['Reminder 1', 'reminder1'],
+      ['Reminder 2', 'reminder2'],
+      ['Reminder 3', 'reminder3'],
+      ['Reminder 4', 'reminder4'],
+    ].map(([label, key]) => ({ label, value: count((p) => p[key] === 'done') })),
+    // Dua rekap lama dibiarkan di API agar backup/klien lama tidak rusak.
+    infraCounts: INFRA_OPTIONS.map((s) => ({ label: s, value: count((p) => p.infrastruktur === s) })),
     kelompokCounts: KELOMPOK_OPTIONS.map((s) => ({ label: s, value: count((p) => p.kelompok === s) })),
   };
 }
@@ -1044,19 +1103,17 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
       <td class="c">${i + 1}</td>
       <td>${escHtml(p.id)}</td>
       <td>${escHtml(p.nama)}</td>
+      <td><span class="pill pill-${escHtml(p.status)}">${escHtml(statusLabel(p.status))}</span></td>
       <td>${escHtml(p.alamat)}</td>
       <td>${escHtml(p.noHp)}</td>
-      <td><span class="pill pill-${escHtml(p.status)}">${escHtml(p.status)}</span></td>
-      <td>${escHtml(p.infrastruktur)}</td>
-      <td>${escHtml(p.tagihan)}</td>
-      <td>${escHtml(p.kelompok)}</td>
-      <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
       <td class="c">${escHtml(fmtMonthID(p.bulanTagihan))}</td>
+      <td class="r">${(p.jumlahTagihan || 0).toLocaleString('id-ID')}</td>
+      <td class="c"><span class="pill ${p.tagihan === 'lunas' || p.tagihan === 'yes' ? 'pill-done' : 'pill-todo'}">${escHtml(paymentLabel(p.tagihan))}</span></td>
       <td class="c"><span class="pill ${p.pengirimanInv === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.pengirimanInv || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">R1 ${escHtml(p.reminder1 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">R2 ${escHtml(p.reminder2 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">R3 ${escHtml(p.reminder3 || 'belum')}</span></td>
-      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">R4 ${escHtml(p.reminder4 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder1 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder1 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder2 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder2 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder3 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder3 || 'belum')}</span></td>
+      <td class="c"><span class="pill ${p.reminder4 === 'done' ? 'pill-done' : 'pill-todo'}">${escHtml(p.reminder4 || 'belum')}</span></td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -1121,8 +1178,8 @@ app.get('/api/export/:kolektorId/html', requireAuth, requireAdmin, (req, res) =>
     <div class="card"><div class="v">${a.totalTagihan.toLocaleString('id-ID')}</div><div class="l">Total Tagihan (Rp)</div></div>
   </div>
   <div class="table-scroll"><table>
-    <thead><tr><th>No</th><th>ID</th><th>Nama Pelanggan</th><th>Alamat</th><th>No HP / WA</th><th>Status</th><th>Infrastruktur</th><th>Tagihan</th><th>Kelompok</th><th>Jumlah Tagihan</th><th>Bulan Tagihan</th><th>Pengiriman inv</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="16">Tidak ada data.</td></tr>'}</tbody>
+    <thead><tr><th>No</th><th>ID</th><th>Customer</th><th>Status</th><th>Alamat Customer</th><th>Telepon Customer</th><th>Bulan</th><th>Total</th><th>Pembayaran</th><th>Pengiriman inv</th><th>Reminder 1</th><th>Reminder 2</th><th>Reminder 3</th><th>Reminder 4</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="14">Tidak ada data.</td></tr>'}</tbody>
   </table></div>
   <div class="foot">Dicetak ${escHtml(today)} — KolektorApp</div>
 </body></html>`;
@@ -1154,8 +1211,8 @@ app.get('/api/export/:kolektorId/pdf', requireAuth, requireAdmin, async (req, re
 
 function generateKolektorPDF(kolektor, pelanggan, month = '') {
   return new Promise((resolve, reject) => {
-    // A4 landscape: kolom laporan bertambah (alamat, produk, kecepatan, tgl pasang,
-    // jatuh tempo, catatan) sehingga portrait sudah terlalu sempit.
+    // A4 landscape dipakai agar tabel Customer, alamat, telepon, dan 5 kolom progres
+    // tetap terbaca saat dicetak.
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
@@ -1211,22 +1268,20 @@ function generateKolektorPDF(kolektor, pelanggan, month = '') {
 
     // Tabel
     const cols = [
-      { label: 'No', width: 22, align: 'center' },
-      { label: 'ID', width: 52, align: 'left' },
-      { label: 'Nama Pelanggan', width: 96, align: 'left' },
-      { label: 'Alamat', width: 150, align: 'left' },
-      { label: 'No HP / WA', width: 78, align: 'left' },
+      { label: 'No', width: 20, align: 'center' },
+      { label: 'ID', width: 48, align: 'left' },
+      { label: 'Customer', width: 105, align: 'left' },
       { label: 'Status', width: 44, align: 'left' },
-      { label: 'Infrastruktur', width: 62, align: 'left' },
-      { label: 'Tagihan', width: 42, align: 'left' },
-      { label: 'Kelompok', width: 88, align: 'left' },
-      { label: 'Jumlah Tagihan', width: 72, align: 'right' },
-      { label: 'Bulan Tagihan', width: 74, align: 'center' },
-      { label: 'Kirim inv', width: 48, align: 'center' },
-      { label: 'Rem1', width: 34, align: 'center' },
-      { label: 'Rem2', width: 34, align: 'center' },
-      { label: 'Rem3', width: 34, align: 'center' },
-      { label: 'Rem4', width: 34, align: 'center' },
+      { label: 'Alamat Customer', width: 120, align: 'left' },
+      { label: 'Telepon Customer', width: 68, align: 'left' },
+      { label: 'Bulan', width: 58, align: 'center' },
+      { label: 'Total', width: 62, align: 'right' },
+      { label: 'Pembayaran', width: 55, align: 'center' },
+      { label: 'Pengiriman inv', width: 45, align: 'center' },
+      { label: 'Reminder 1', width: 34, align: 'center' },
+      { label: 'Reminder 2', width: 34, align: 'center' },
+      { label: 'Reminder 3', width: 34, align: 'center' },
+      { label: 'Reminder 4', width: 34, align: 'center' },
     ];
     const tableW = cols.reduce((s, c) => s + c.width, 0);
     const headerH = 18;
@@ -1255,14 +1310,12 @@ function generateKolektorPDF(kolektor, pelanggan, month = '') {
         String(i + 1),
         p.id,
         p.nama,
+        statusLabel(p.status),
         p.alamat || '-',
         p.noHp || '-',
-        p.status,
-        p.infrastruktur,
-        p.tagihan,
-        p.kelompok,
-        'Rp ' + (p.jumlahTagihan || 0).toLocaleString('id-ID'),
         fmtMonthID(p.bulanTagihan),
+        (p.jumlahTagihan || 0).toLocaleString('id-ID'),
+        paymentLabel(p.tagihan),
         p.pengirimanInv || 'belum',
         p.reminder1 || 'belum',
         p.reminder2 || 'belum',
