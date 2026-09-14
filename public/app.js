@@ -47,7 +47,7 @@ const state = {
   kolektor: [],
   months: [],
   dashboardMonth: 'ALL',
-  pelFilter: { search: '', kolektorId: 'all', bulan: 'ALL', page: 1 },
+  pelFilter: { search: '', kolektorId: 'all', bulan: 'ALL', status: 'all', tagihan: 'all', page: 1 },
   pageSize: 15,
 };
 
@@ -974,6 +974,16 @@ function renderPelangganTable() {
   const f = state.pelFilter;
   let rows = state.pelanggan;
   if (isAdmin && f.kolektorId && f.kolektorId !== 'all') rows = rows.filter((p) => p.kolektorId === f.kolektorId);
+  if (f.status && f.status !== 'all') {
+    rows = rows.filter((p) => String(p.status || '').toLowerCase() === f.status);
+  }
+  if (f.tagihan && f.tagihan !== 'all') {
+    rows = rows.filter((p) => {
+      const payment = String(p.tagihan || '').toLowerCase();
+      const normalized = payment === 'lunas' || payment === 'yes' ? 'lunas' : 'belum';
+      return normalized === f.tagihan;
+    });
+  }
   if (f.search) {
     const q = f.search.toLowerCase();
     rows = rows.filter((p) => (p.nama || '').toLowerCase().includes(q) || (p.noHp || '').includes(q) || (p.id || '').toLowerCase().includes(q) || (p.alamat || '').toLowerCase().includes(q));
@@ -990,6 +1000,14 @@ function renderPelangganTable() {
       ${state.kolektor.map((k) => `<option value="${k.id}" ${f.kolektorId === k.id ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}
     </select>` : '';
   const monthFilter = `<select class="input toolbar-select" id="pel-filter-bulan" onchange="setPelFilter('bulan', this.value)">${monthOptions(f.bulan)}</select>`;
+  const statusFilter = `<select class="input toolbar-select" id="pel-filter-status" onchange="setPelFilter('status', this.value)">
+      <option value="all" ${f.status === 'all' ? 'selected' : ''}>Semua Status</option>
+      ${OPTIONS.status.map((s) => `<option value="${s}" ${f.status === s ? 'selected' : ''}>${esc(STATUS_LABELS[s])}</option>`).join('')}
+    </select>`;
+  const paymentFilter = `<select class="input toolbar-select" id="pel-filter-tagihan" onchange="setPelFilter('tagihan', this.value)">
+      <option value="all" ${f.tagihan === 'all' ? 'selected' : ''}>Semua Pembayaran</option>
+      ${OPTIONS.pembayaran.map((s) => `<option value="${s}" ${f.tagihan === s ? 'selected' : ''}>${esc(PAYMENT_LABELS[s])}</option>`).join('')}
+    </select>`;
 
   const cols = visibleColumns().filter((x) => x.on).map((x) => x.f);
   const head = cols.map((f2) => `<th${f2.type === 'currency' ? ' class="num"' : ''}>${esc(f2.label)}</th>`).join('')
@@ -1008,6 +1026,8 @@ function renderPelangganTable() {
     <div class="toolbar">
       ${kolektorFilter}
       ${monthFilter}
+      ${statusFilter}
+      ${paymentFilter}
       <div class="search-box"><input type="text" id="pel-search" placeholder="Cari nama / no HP / ID / alamat…" value="${esc(f.search)}" oninput="setPelFilter('search', this.value)" /></div>
       <button class="btn btn-outline btn-sm" id="pel-col-btn" onclick="toggleColumnMenu()">⚙️ Kolom</button>
       <div class="grow"></div>
@@ -1029,6 +1049,12 @@ async function setPelFilter(key, value) {
   if (key === 'search') state.pelFilter.search = value;
   if (key === 'kolektorId') { state.pelFilter.kolektorId = value; state.pelFilter.page = 1; await renderPelanggan(); return; }
   if (key === 'bulan') { state.pelFilter.bulan = value || 'ALL'; state.pelFilter.page = 1; await renderPelanggan(); return; }
+  if (key === 'status' || key === 'tagihan') {
+    state.pelFilter[key] = value || 'all';
+    state.pelFilter.page = 1;
+    renderPelangganTable();
+    return;
+  }
   if (key === 'page') state.pelFilter.page = Number(value) || 1;
   renderPelangganTable();
   if (key === 'search') {
