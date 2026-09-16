@@ -269,9 +269,9 @@ const PAYMENT_LABELS = { lunas: 'Lunas', belum: 'Belum', yes: 'Lunas', no: 'Belu
 const displayStatus = (v) => STATUS_LABELS[String(v || '').toLowerCase()] || v || '-';
 const displayPayment = (v) => PAYMENT_LABELS[String(v || '').toLowerCase()] || v || 'Belum';
 const statusBadge = (s) => `<span class="badge b-${esc(String(s || '').toLowerCase())}"><span class="dot"></span>${esc(displayStatus(s))}</span>`;
+const isPaymentLunas = (v) => { const k = String(v || '').toLowerCase(); return k === 'lunas' || k === 'yes'; };
 const paymentBadge = (s) => {
-  const key = String(s || '').toLowerCase();
-  const cls = key === 'lunas' || key === 'yes' ? 'lunas' : 'belum';
+  const cls = isPaymentLunas(s) ? 'lunas' : 'belum';
   return `<span class="badge b-${cls}"><span class="dot"></span>${esc(displayPayment(s))}</span>`;
 };
 // Alias ini dipertahankan untuk pemanggil lama.
@@ -948,21 +948,46 @@ function fmtBulanTagihan(v) {
   return BULAN_PENDEK[i] + ' ' + m[1];
 }
 
+// Bungkus badge agar bisa diklik langsung dari tabel (dipakai Pembayaran & Pengiriman inv/Reminder).
+// Aksinya ditangani lewat event delegation di bawah, jadi cukup pasang data-attribute.
+function clickableBadge(p, key, inner, title) {
+  return `<span class="badge-click" role="button" tabindex="0" title="${esc(title)}" data-toggle-rec="${esc(recordId(p))}" data-toggle-key="${esc(key)}">${inner}</span>`;
+}
+
+// Satu listener global untuk semua badge yang bisa diklik
+document.addEventListener('click', (e) => {
+  const el = e.target.closest && e.target.closest('.badge-click[data-toggle-key]');
+  if (!el) return;
+  e.stopPropagation();
+  toggleQuickField(el.dataset.toggleRec, el.dataset.toggleKey);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest && e.target.closest('.badge-click[data-toggle-key]');
+  if (!el) return;
+  e.preventDefault();
+  e.stopPropagation();
+  toggleQuickField(el.dataset.toggleRec, el.dataset.toggleKey);
+});
+
 function renderCell(f, p) {
   const v = p[f.key];
   switch (f.key) {
     case 'id': return `<code>${esc(v)}</code>`;
     case 'nama': return `<strong>${esc(v)}</strong>`;
     case 'status': return statusBadge(v);
-    case 'tagihan': return paymentBadge(v);
+    case 'tagihan': {
+      // Format & perilaku disamakan dengan kolom done: cukup klik untuk ganti Lunas ↔ Belum
+      const isLunas = isPaymentLunas(v);
+      return clickableBadge(p, 'tagihan', paymentBadge(v), isLunas ? 'Klik: tandai belum' : 'Klik: tandai lunas');
+    }
     case 'jumlahTagihan': return `<strong>${fmtRp(v)}</strong>`;
     case 'bulanTagihan': return v ? `<strong>${esc(fmtBulanTagihan(v))}</strong>` : '-';
     default:
       if (f.type === 'done') {
         const isDone = v === 'done';
-        const inner = isDone ? '<span class="badge b-done">✓ done</span>' : '<span class="badge b-todo">belum</span>';
-        return isDone ? inner
-          : `<span class="badge-click" title="Klik: tandai done" onclick="event.stopPropagation();toggleDoneField('${jsAttr(recordId(p))}','${f.key}')">${inner}</span>`;
+        const inner = isDone ? '<span class="badge b-done"><span class="dot"></span>✓ done</span>' : '<span class="badge b-todo"><span class="dot"></span>belum</span>';
+        return clickableBadge(p, f.key, inner, isDone ? 'Klik: tandai belum' : 'Klik: tandai done');
       }
       return v ? esc(v) : '-';
   }
@@ -1222,20 +1247,41 @@ function openPelangganModal(id) {
   });
 }
 
-// Toggle cepat done ↔ belum langsung dari tabel (PUT menimpa semua field, jadi kirim utuh)
-async function toggleDoneField(id, key) {
+// Toggle cepat langsung dari tabel — dipakai kolom Pembayaran (lunas ↔ belum)
+// dan kolom done (Pengiriman inv, Reminder 1–4). PUT menimpa semua field, jadi kirim utuh.
+async function toggleQuickField(id, key) {
   const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
   if (!p) return;
   const payload = {};
   PELANGGAN_FIELDS.forEach((f) => { if (f.key !== 'id') payload[f.key] = p[f.key]; });
-  payload[key] = p[key] === 'done' ? 'belum' : 'done';
+
+  const isPayment = key === 'tagihan';
+  const next = isPayment
+    ? (isPaymentLunas(p[key]) ? 'belum' : 'lunas')
+    : (p[key] === 'done' ? 'belum' : 'done');
+  payload[key] = next;
   if (state.user.role === 'admin' && p.kolektorId) payload.kolektorId = p.kolektorId;
+
+  // Optimistic update supaya badge langsung berubah saat diklik
+  const prev = p[key];
+  p[key] = next;
+  renderPelangganTable();
   try {
     await api('/api/pelanggan/' + enc(recordId(p)), { method: 'PUT', body: JSON.stringify(payload) });
     await renderPelanggan();
-    toast(fLabel(key) + ': ' + (payload[key] === 'done' ? 'done ✓' : 'belum'));
-  } catch (e) { toast(e.message, 'error'); }
+    const labelBaru = isPayment
+      ? (next === 'lunas' ? 'Lunas ✓' : 'Belum')
+      : (next === 'done' ? 'done ✓' : 'belum');
+    toast(fLabel(key) + ': ' + labelBaru);
+  } catch (e) {
+    p[key] = prev;
+    renderPelangganTable();
+    toast(e.message, 'error');
+  }
 }
+
+// Alias untuk pemanggil lama
+const toggleDoneField = toggleQuickField;
 
 const fLabel = (key) => (PELANGGAN_FIELDS.find((f) => f.key === key) || {}).label || key;
 

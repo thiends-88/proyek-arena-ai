@@ -291,9 +291,17 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .seg2-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(15, 118, 110, .25); }
 input[type=month].input { min-height: 42px; }
 .badge.b-done { background: #dcfce7; color: #15803d; }
-.badge-click { cursor: pointer; display: inline-block; border-radius: 999px; transition: transform .12s ease, box-shadow .12s ease; }
-.badge-click:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15,118,110,.22); outline: 1px dashed var(--primary); }
 .badge.b-todo { background: #f1f5f9; color: #64748b; }
+
+/* Badge yang bisa diklik untuk ganti status (Pembayaran, Pengiriman inv, Reminder 1–4) */
+.badge-click {
+  cursor: pointer; display: inline-block; border-radius: 999px;
+  transition: transform .12s ease, box-shadow .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.badge-click:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15,118,110,.22); outline: 1px dashed var(--primary); }
+.badge-click:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.badge-click:active { transform: scale(.96); }
 .form-grid { margin-bottom: 4px; }
 .field .fld-hint { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
 .field textarea.input { resize: vertical; min-height: 46px; line-height: 1.45; }
