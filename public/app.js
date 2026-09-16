@@ -469,8 +469,8 @@ const NAV = {
 function renderSidebar() {
   const u = state.user;
   $('#nav').innerHTML = (NAV[u.role] || []).map((n) =>
-    `<div class="nav-item ${state.view === n.id ? 'active' : ''}" data-view="${n.id}">
-       <span class="ico">${n.ico}</span> ${esc(n.label)}
+    `<div class="nav-item ${state.view === n.id ? 'active' : ''}" data-view="${n.id}" title="${esc(n.label)}">
+       <span class="ico">${n.ico}</span> <span class="lbl">${esc(n.label)}</span>
      </div>`).join('');
   document.querySelectorAll('.nav-item').forEach((el) => el.addEventListener('click', () => { closeSidebar(); go(el.dataset.view); }));
   $('#user-avatar').textContent = (u.name || '?').charAt(0).toUpperCase();
@@ -490,6 +490,25 @@ function closeSidebar() {
 }
 function toggleSidebar() {
   if (document.body.classList.contains('sidebar-open')) closeSidebar(); else openSidebar();
+}
+
+/* ---------- Sidebar collapse (desktop) ---------- */
+// Klik tombol « di sidebar: menu diciutkan jadi ikon saja supaya kolom konten kanan lebih lebar.
+// Klik lagi (»): kembali normal. Preferensi diingkat lewat localStorage.
+function applySidebarCollapse(collapsed) {
+  document.body.classList.toggle('sidebar-collapsed', !!collapsed);
+  const b = $('#btn-sidebar-collapse');
+  if (b) {
+    b.textContent = collapsed ? '»' : '«';
+    b.title = collapsed ? 'Besarkan menu' : 'Ciutkan menu';
+    b.setAttribute('aria-label', b.title);
+    b.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+function toggleSidebarCollapsed() {
+  const collapsed = !document.body.classList.contains('sidebar-collapsed');
+  applySidebarCollapse(collapsed);
+  try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch (e) {}
 }
 
 function go(view, opts = {}) {
@@ -1373,6 +1392,13 @@ async function init() {
   $('#btn-sidebar-close').addEventListener('click', closeSidebar);
   $('#sidebar-backdrop').addEventListener('click', closeSidebar);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+  // Sidebar collapse (desktop): pulihkan preferensi terakhir lalu pasang event tombol «/»
+  let sidebarCollapsed = false;
+  try { sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === '1'; } catch (e) {}
+  applySidebarCollapse(sidebarCollapsed);
+  $('#btn-sidebar-collapse').addEventListener('click', toggleSidebarCollapsed);
+
   const mqDesktop = window.matchMedia('(min-width: 901px)');
   const onMq = (e) => { if (e.matches) closeSidebar(); };
   if (mqDesktop.addEventListener) mqDesktop.addEventListener('change', onMq);

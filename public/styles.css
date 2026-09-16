@@ -138,6 +138,23 @@ code { background: #e2e8f0; padding: 1px 6px; border-radius: 6px; font-size: .85
 #sidebar-backdrop { display: none; }
 .content { padding: 26px 28px 60px; max-width: 1240px; width: 100%; margin: 0 auto; }
 
+/* ---------- Sidebar collapse (desktop): menu jadi ikon saja ---------- */
+/* Klik tombol « di sidebar untuk menciutkan menu (hanya ikon) supaya kolom kanan lebih lebar.
+   Klik lagi (») untuk mengembalikan seperti semula. Pilihan diingat lewat localStorage. */
+#sidebar { transition: width .22s ease, flex-basis .22s ease; }
+.sidebar-collapse { flex: 0 0 auto; font-size: 14px; font-weight: 700; }
+@media (min-width: 901px) {
+  body.sidebar-collapsed #sidebar { width: 66px; flex: 0 0 66px; }
+  body.sidebar-collapsed .sidebar-brand { flex-direction: column; gap: 8px; padding: 16px 6px 12px; }
+  body.sidebar-collapsed .sidebar-brand .brand-text { display: none; }
+  body.sidebar-collapsed #nav { padding: 12px 8px; }
+  body.sidebar-collapsed .nav-item { justify-content: center; gap: 0; padding: 11px 0; }
+  body.sidebar-collapsed .nav-item .lbl { display: none; }
+  body.sidebar-collapsed .sidebar-user { flex-direction: column; gap: 8px; padding: 12px 6px; }
+  body.sidebar-collapsed .sidebar-user .user-meta { display: none; }
+  body.sidebar-collapsed .content { max-width: 1400px; }
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex; align-items: center; gap: 7px;
@@ -384,6 +401,7 @@ input[type=month].input { min-height: 42px; }
   body.sidebar-open #sidebar-backdrop { opacity: 1; visibility: visible; }
   body.sidebar-open { overflow: hidden; }
   .sidebar-close { display: inline-flex; }
+  .sidebar-collapse { display: none; } /* fitur collapse hanya untuk desktop */
   .sidebar-user { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
   .nav-item { padding: 13px 14px; font-size: 15px; }
   .menu-btn { display: inline-flex; }
