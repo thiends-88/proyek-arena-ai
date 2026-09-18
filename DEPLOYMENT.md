@@ -331,12 +331,18 @@ sudo systemctl start kolektorapp
 
 ## I. Update Aplikasi dari GitHub (saat ada versi baru)
 
-Bisa. Kode perubahan terbaru dari sesi ini sudah tersedia di branch GitHub:
-`arena/01a08f7f-proyek-arena-ai`.
+Kode perubahan terbaru dari sesi ini tersedia di branch GitHub:
+**`arena/01a0b23b-proyek-arena-ai`** (perubahan: pilihan **view data 20 / 50 / 100 / semua** di
+halaman Data Pelanggan).
 
-> Untuk produksi, cara paling aman adalah menunggu branch ini digabung ke `main`, lalu
-> server cukup mengikuti `main`. Jika ingin memakai perubahan ini sekarang, gunakan
-> branch sesi tersebut secara eksplisit seperti langkah di bawah.
+- **Pull request (link merge):** <https://github.com/thiends-88/proyek-arena-ai/pull/20>
+- Halaman **Compare** (lihat diff sebelum merge):
+  <https://github.com/thiends-88/proyek-arena-ai/compare/main...arena/01a0b23b-proyek-arena-ai>
+
+> Untuk produksi, cara paling aman adalah **merge PR di atas lebih dulu**, lalu server cukup
+> mengikuti `main` (lihat bagian *Jika branch sudah digabung ke `main`* di bawah). Kalau ingin
+> memakai perubahan ini sekarang tanpa menunggu merge, pakai branch sesi tersebut secara
+> eksplisit seperti langkah di bawah.
 
 ### Update pertama ke branch perubahan ini
 
@@ -352,7 +358,7 @@ cp -a data "data.backup-$(date +%F-%H%M)"
 git status
 
 git fetch origin
-git checkout -B arena/01a08f7f-proyek-arena-ai origin/arena/01a08f7f-proyek-arena-ai
+git checkout -B arena/01a0b23b-proyek-arena-ai origin/arena/01a0b23b-proyek-arena-ai
 npm ci --omit=dev
 sudo systemctl restart kolektorapp
 sudo systemctl status kolektorapp --no-pager
@@ -370,7 +376,7 @@ npm start
 cd /opt/kolektorapp
 cp -a data "data.backup-$(date +%F-%H%M)"
 git fetch origin
-git pull --ff-only origin arena/01a08f7f-proyek-arena-ai
+git pull --ff-only origin arena/01a0b23b-proyek-arena-ai
 npm ci --omit=dev
 sudo systemctl restart kolektorapp
 sudo systemctl status kolektorapp --no-pager
@@ -390,6 +396,19 @@ npm ci --omit=dev
 sudo systemctl restart kolektorapp
 ```
 
+### Cek hasil update (pilihan view data)
+
+1. Buka aplikasi di browser → login → menu **Pelanggan**.
+2. Di toolbar atas tabel harus muncul dropdown **View data** berisi
+   `Tampil 20 data` / `Tampil 50 data` / `Tampil 100 data` / `Tampil semua data`.
+3. Coba pilih `Tampil semua data` → semua baris langsung tampil dan di bawah tabel muncul
+   tulisan `Menampilkan semua … data`.
+4. Kalau dropdown belum muncul, lakukan **hard refresh** (`Ctrl+Shift+R`, di HP: tutup tab lalu
+   buka lagi). Pada rilis ini versi aset dinaikkan ke `?v=27`, jadi file lama tidak akan dipakai lagi.
+
+> Tidak ada perubahan pada `server.js` dan struktur `data/db.json` pada rilis ini, sehingga data
+> pelanggan yang sudah ada aman. Tetap jalankan backup `data/` seperti langkah di atas.
+
 > Folder `data/` dan file `data/db.json` tidak terpengaruh oleh `git pull` karena di-ignore
 > Git. Backup tetap disarankan karena aplikasi akan menjalankan migrasi ringan ketika versi
 > baru mulai, misalnya menyesuaikan nilai pembayaran lama `yes/no/free` menjadi `Lunas/Belum`.
@@ -400,9 +419,21 @@ sudo systemctl restart kolektorapp
 
 ## Ringkasan Cepat
 
+### Instalasi baru
 1. Buat **LXC/VM** (Ubuntu/Debian) di Proxmox.
 2. Install **Node.js 20 LTS**.
 3. `git clone` repo → `npm install` → `npm start` (tes).
 4. Daftarkan sebagai **systemd service**.
 5. Buka firewall port **3000** → akses `http://IP:3000`.
 6. Ganti **password default** + siapkan **backup `data/db.json`**.
+
+### Aplikasi sudah jalan — update ke rilis terbaru
+```bash
+cd /opt/kolektorapp
+cp -a data "data.backup-$(date +%F-%H%M)"
+git fetch origin && git pull --ff-only origin main
+npm ci --omit=dev
+sudo systemctl restart kolektorapp
+```
+Lalu buka aplikasi dan **refresh** halaman. Detail + cara pakai branch perubahan sebelum merge ada di
+[bagian I](#i-update-aplikasi-dari-github-saat-ada-versi-baru).
