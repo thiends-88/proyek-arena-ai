@@ -40,6 +40,16 @@ Bulan menerima tulisan bebas: `Agustus 2026`, `agu 26`, `8/2026`, `2026-08` → 
 
 **Dipakai otomatis di 5 tempat:** form input · tabel data (kolom **⚙️ Kolom** untuk menyembunyikan/menampilkan kolom) · template import CSV/XLSX · pencocokan kolom saat import · laporan PDF/HTML. Di tabel, badge `belum` bisa **diklik** untuk menandai `done` tanpa membuka form.
 
+### 👁️ Pilihan view data
+Di halaman **Data Pelanggan** ada dropdown **View data** untuk mengatur berapa baris yang ditampilkan sekaligus:
+
+`Tampil 20 data` · `Tampil 50 data` · `Tampil 100 data` · `Tampil semua data`
+
+- Berlaku untuk data yang sudah difilter (kolektor, bulan, status, pembayaran, dan kotak pencarian) — jadi "semua data" berarti semua hasil filter.
+- Pilihan **disimpan per perangkat** (localStorage), jadi tetap terpakai saat halaman dibuka ulang. Nilai awalnya 20 data.
+- Baris pagination menampilkan rentang yang sedang dilihat, mis. `Menampilkan 21–40 dari 137 data · halaman 2 / 7 · 20 per halaman`. Tombol `‹` `›` hanya muncul bila datanya lebih dari satu halaman.
+- Mengganti pilihan view otomatis kembali ke halaman 1 supaya tidak ada halaman kosong.
+
 ### 🔧 Menambah / memindah / menghapus kolom
 Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
 - `public/app.js` → `PELANGGAN_FIELDS` (label, tipe, `size: 'full'|'half'`, `def`, `required`)

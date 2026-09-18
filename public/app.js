@@ -48,7 +48,9 @@ const state = {
   months: [],
   dashboardMonth: 'ALL',
   pelFilter: { search: '', kolektorId: 'all', bulan: 'ALL', status: 'all', tagihan: 'all', page: 1 },
-  pageSize: 15,
+  // Pilihan "view data" tabel pelanggan: 20 / 50 / 100 baris atau 'all' (semua data).
+  // Nilainya diingat di perangkat masing-masing (localStorage) — lihat PAGE_SIZE_KEY.
+  pageSize: 20,
 };
 
 /* ---------- Util ---------- */
@@ -1012,6 +1014,36 @@ function renderCell(f, p) {
   }
 }
 
+/* ---------- Pilihan view data (jumlah baris per halaman) ---------- */
+// Dipakai tabel data pelanggan: 20, 50, 100 baris, atau 'all' = tampilkan semua data.
+const PAGE_SIZE_KEY = 'kolektorapp.pelPageSize.v1';
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
+
+// Terima angka apa pun dari <select>/localStorage → selalu kembali ke nilai yang valid.
+function normPageSize(value) {
+  if (value === 'all') return 'all';
+  const n = Number(value);
+  return PAGE_SIZE_OPTIONS.includes(n) ? n : DEFAULT_PAGE_SIZE;
+}
+
+function loadPageSize() {
+  try { return normPageSize(localStorage.getItem(PAGE_SIZE_KEY)); } catch (e) { return DEFAULT_PAGE_SIZE; }
+}
+
+function savePageSize() {
+  try { localStorage.setItem(PAGE_SIZE_KEY, String(state.pageSize)); } catch (e) { /* preview bisa memblokir */ }
+}
+
+// Jumlah baris yang benar-benar ditampilkan pada satu halaman (angka, bukan 'all').
+function rowsPerPage(total) {
+  return state.pageSize === 'all' ? Math.max(total, 1) : (Number(state.pageSize) || DEFAULT_PAGE_SIZE);
+}
+
+function labelPageSize() {
+  return state.pageSize === 'all' ? 'Semua' : String(state.pageSize);
+}
+
 function renderPelangganTable() {
   const c = $('#content');
   const isAdmin = state.user.role === 'admin';
@@ -1033,10 +1065,13 @@ function renderPelangganTable() {
     rows = rows.filter((p) => (p.nama || '').toLowerCase().includes(q) || (p.noHp || '').includes(q) || (p.id || '').toLowerCase().includes(q) || (p.alamat || '').toLowerCase().includes(q));
   }
   const total = rows.length;
-  const pages = Math.max(1, Math.ceil(total / state.pageSize));
+  const perPage = rowsPerPage(total);
+  const pages = Math.max(1, Math.ceil(total / perPage));
   if (f.page > pages) f.page = pages;
-  const start = (f.page - 1) * state.pageSize;
-  const pageRows = rows.slice(start, start + state.pageSize);
+  if (f.page < 1) f.page = 1;
+  const start = (f.page - 1) * perPage;
+  const pageRows = rows.slice(start, start + perPage);
+  const showAll = state.pageSize === 'all';
 
   const kolektorFilter = isAdmin ? `
     <select class="input toolbar-select" id="pel-filter-kolektor" onchange="setPelFilter('kolektorId', this.value)">
@@ -1051,6 +1086,12 @@ function renderPelangganTable() {
   const paymentFilter = `<select class="input toolbar-select" id="pel-filter-tagihan" onchange="setPelFilter('tagihan', this.value)">
       <option value="all" ${f.tagihan === 'all' ? 'selected' : ''}>Semua Pembayaran</option>
       ${OPTIONS.pembayaran.map((s) => `<option value="${s}" ${f.tagihan === s ? 'selected' : ''}>${esc(PAYMENT_LABELS[s])}</option>`).join('')}
+    </select>`;
+
+  // Pilihan view data: berapa baris yang ditampilkan (20 / 50 / 100 / semua)
+  const viewFilter = `<select class="input toolbar-select view-select" id="pel-view-size" title="Jumlah data yang ditampilkan" onchange="setPelFilter('pageSize', this.value)">
+      ${PAGE_SIZE_OPTIONS.map((n) => `<option value="${n}" ${state.pageSize === n ? 'selected' : ''}>Tampil ${n} data</option>`).join('')}
+      <option value="all" ${showAll ? 'selected' : ''}>Tampil semua data</option>
     </select>`;
 
   const cols = visibleColumns().filter((x) => x.on).map((x) => x.f);
@@ -1072,6 +1113,7 @@ function renderPelangganTable() {
       ${monthFilter}
       ${statusFilter}
       ${paymentFilter}
+      ${viewFilter}
       <div class="search-box"><input type="text" id="pel-search" placeholder="Cari nama / no HP / ID / alamat…" value="${esc(f.search)}" oninput="setPelFilter('search', this.value)" /></div>
       <button class="btn btn-outline btn-sm" id="pel-col-btn" onclick="toggleColumnMenu()">⚙️ Kolom</button>
       <div class="grow"></div>
@@ -1084,9 +1126,15 @@ function renderPelangganTable() {
       ${body}
     </tbody></table></div></div>
     <div class="pagination">
-      <span>Halaman ${f.page} / ${pages}</span>
-      <button onclick="setPelFilter('page', ${f.page - 1})" ${f.page <= 1 ? 'disabled' : ''}>‹</button>
-      <button onclick="setPelFilter('page', ${f.page + 1})" ${f.page >= pages ? 'disabled' : ''}>›</button>
+      <span class="page-info" data-label="View data">${(() => {
+        if (!total) return 'Belum ada data untuk ditampilkan';
+        if (showAll) return `Menampilkan <b>semua ${total}</b> data`;
+        return `Menampilkan <b>${start + 1}–${start + pageRows.length}</b> dari <b>${total}</b> data`;
+      })()}
+        <span class="page-sep">·</span> ${pages > 1 ? `halaman ${f.page} / ${pages}` : 'halaman 1 / 1'}
+        <span class="hide-sm"> · ${labelPageSize()}${showAll ? '' : ' per halaman'}</span></span>
+      ${pages > 1 ? `<button onclick="setPelFilter('page', ${f.page - 1})" ${f.page <= 1 ? 'disabled' : ''}>‹</button>
+      <button onclick="setPelFilter('page', ${f.page + 1})" ${f.page >= pages ? 'disabled' : ''}>›</button>` : ''}
     </div>`;
 }
 async function setPelFilter(key, value) {
@@ -1100,6 +1148,11 @@ async function setPelFilter(key, value) {
     return;
   }
   if (key === 'page') state.pelFilter.page = Number(value) || 1;
+  if (key === 'pageSize') {
+    state.pageSize = normPageSize(value);
+    savePageSize();
+    state.pelFilter.page = 1; // kembali ke halaman pertama supaya tidak "nyangkut" di halaman kosong
+  }
   renderPelangganTable();
   if (key === 'search') {
     const si = $('#pel-search');
@@ -1392,6 +1445,9 @@ async function init() {
   $('#btn-sidebar-close').addEventListener('click', closeSidebar);
   $('#sidebar-backdrop').addEventListener('click', closeSidebar);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+  // Pilihan view data pelanggan (20/50/100/semua): pulihkan preferensi terakhir perangkat ini
+  state.pageSize = loadPageSize();
 
   // Sidebar collapse (desktop): pulihkan preferensi terakhir lalu pasang event tombol «/»
   let sidebarCollapsed = false;
