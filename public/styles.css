@@ -268,10 +268,26 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .b-kelompok4 { background: #dbeafe; color: #1d4ed8; }
 .b-kelompok5 { background: #ede9fe; color: #6d28d9; }
 
+select.input.toolbar-select.view-select { width: 168px; }
 .pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.pagination .page-info b { color: var(--ink); font-weight: 600; }
+.pagination .page-sep { padding: 0 2px; opacity: .6; }
 .pagination button { padding: 5px 11px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
 .pagination button:hover:not(:disabled) { background: #f1f5f9; }
 .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+/* Di layar HP tren pagination jadi kartu kecil (senada dengan tabel yang jadi kartu) */
+@media (max-width: 720px) {
+  select.input.toolbar-select.view-select { flex: 1 1 100%; width: 100%; }
+  .pagination { justify-content: stretch; }
+  .pagination .page-info {
+    display: block; width: 100%; text-align: center; padding: 9px 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .pagination .page-info::before {
+    content: attr(data-label); display: block; font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+  }
+}
 
 /* ---------- Modal ---------- */
 #modal-root { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
