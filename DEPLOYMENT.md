@@ -352,7 +352,7 @@ Jalankan di dalam container/VM Proxmox sebagai user pemilik aplikasi:
 cd /opt/kolektorapp
 
 # Pastikan data aman sebelum update — data aplikasi ada di data/db.json
-cp -a data "data.backup-$(date +%F-%H%M)"
+[ -d data ] && cp -a data "data.backup-$(date +%F-%H%M)"
 
 # Cek apakah ada perubahan lokal sebelum mengambil kode
 git status
@@ -374,7 +374,7 @@ npm start
 
 ```bash
 cd /opt/kolektorapp
-cp -a data "data.backup-$(date +%F-%H%M)"
+[ -d data ] && cp -a data "data.backup-$(date +%F-%H%M)"
 git fetch origin
 git pull --ff-only origin arena/01a0b23b-proyek-arena-ai
 npm ci --omit=dev
@@ -388,7 +388,7 @@ Setelah pull request digabung, server produksi dapat dikembalikan ke branch stab
 
 ```bash
 cd /opt/kolektorapp
-cp -a data "data.backup-$(date +%F-%H%M)"
+[ -d data ] && cp -a data "data.backup-$(date +%F-%H%M)"
 git fetch origin
 git checkout main
 git pull --ff-only origin main
@@ -430,7 +430,7 @@ sudo systemctl restart kolektorapp
 ### Aplikasi sudah jalan — update ke rilis terbaru
 ```bash
 cd /opt/kolektorapp
-cp -a data "data.backup-$(date +%F-%H%M)"
+[ -d data ] && cp -a data "data.backup-$(date +%F-%H%M)"
 git fetch origin && git pull --ff-only origin main
 npm ci --omit=dev
 sudo systemctl restart kolektorapp
