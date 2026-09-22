@@ -332,17 +332,22 @@ sudo systemctl start kolektorapp
 ## I. Update Aplikasi dari GitHub (saat ada versi baru)
 
 Kode perubahan terbaru dari sesi ini tersedia di branch GitHub:
-**`arena/01a0b23b-proyek-arena-ai`** (perubahan: pilihan **view data 20 / 50 / 100 / semua** di
-halaman Data Pelanggan).
+**`arena/01a0c6df-proyek-arena-ai`** (perubahan: **template pesan WhatsApp Reminder 1–4**,
+tanggal jatuh tempo **tiap tanggal 20**, dan **kolom reminder otomatis `done`** saat pesan dikirim).
 
-- **Pull request (link merge):** <https://github.com/thiends-88/proyek-arena-ai/pull/20>
+- **Pull request (link merge):** <https://github.com/thiends-88/proyek-arena-ai/pull/21>
 - Halaman **Compare** (lihat diff sebelum merge):
-  <https://github.com/thiends-88/proyek-arena-ai/compare/main...arena/01a0b23b-proyek-arena-ai>
+  <https://github.com/thiends-88/proyek-arena-ai/compare/main...arena/01a0c6df-proyek-arena-ai>
 
 > Untuk produksi, cara paling aman adalah **merge PR di atas lebih dulu**, lalu server cukup
 > mengikuti `main` (lihat bagian *Jika branch sudah digabung ke `main`* di bawah). Kalau ingin
 > memakai perubahan ini sekarang tanpa menunggu merge, pakai branch sesi tersebut secara
 > eksplisit seperti langkah di bawah.
+
+> ✅ **Aman untuk data lama.** Rilis ini hanya mengubah `public/app.js`, `public/index.html`,
+> `public/styles.css`, `server.js` dan dokumen. **Tidak ada** perubahan skema `data/db.json` dan
+> **tidak ada** migrasi; `package.json` / `package-lock.json` juga tidak berubah sehingga dependensi
+> tidak perlu dipasang ulang. Folder `data/` di-ignore Git, jadi `git pull` tidak menyentuhnya.
 
 ### Update pertama ke branch perubahan ini
 
@@ -358,11 +363,13 @@ cd /opt/kolektorapp
 git status
 
 git fetch origin
-git checkout -B arena/01a0b23b-proyek-arena-ai origin/arena/01a0b23b-proyek-arena-ai
-npm ci --omit=dev
+git checkout -B arena/01a0c6df-proyek-arena-ai origin/arena/01a0c6df-proyek-arena-ai
 sudo systemctl restart kolektorapp
 sudo systemctl status kolektorapp --no-pager
 ```
+
+`npm ci --omit=dev` **tidak diperlukan** pada rilis ini (dependensi tidak berubah); jalankan hanya
+bila `git pull` menampilkan perubahan pada `package-lock.json`.
 
 Jika service belum memakai systemd, hentikan proses `npm start` lama dengan `Ctrl+C`, lalu jalankan:
 
@@ -376,8 +383,7 @@ npm start
 cd /opt/kolektorapp
 [ -d data ] && cp -a data "data.backup-$(date +%F-%H%M)"
 git fetch origin
-git pull --ff-only origin arena/01a0b23b-proyek-arena-ai
-npm ci --omit=dev
+git pull --ff-only origin arena/01a0c6df-proyek-arena-ai
 sudo systemctl restart kolektorapp
 sudo systemctl status kolektorapp --no-pager
 ```
@@ -392,22 +398,25 @@ cd /opt/kolektorapp
 git fetch origin
 git checkout main
 git pull --ff-only origin main
-npm ci --omit=dev
 sudo systemctl restart kolektorapp
 ```
 
-### Cek hasil update (pilihan view data)
+### Cek hasil update (template pesan WhatsApp)
 
-1. Buka aplikasi di browser → login → menu **Pelanggan**.
-2. Di toolbar atas tabel harus muncul dropdown **View data** berisi
-   `Tampil 20 data` / `Tampil 50 data` / `Tampil 100 data` / `Tampil semua data`.
-3. Coba pilih `Tampil semua data` → semua baris langsung tampil dan di bawah tabel muncul
-   tulisan `Menampilkan semua … data`.
-4. Kalau dropdown belum muncul, lakukan **hard refresh** (`Ctrl+Shift+R`, di HP: tutup tab lalu
-   buka lagi). Pada rilis ini versi aset dinaikkan ke `?v=27`, jadi file lama tidak akan dipakai lagi.
+1. Buka aplikasi di browser → login → menu **Data Pelanggan**.
+2. Klik **💬 Kirim Pesan** pada salah satu baris → harus ada 7 tombol template, termasuk
+   `🔔 Reminder 1`, `🔔 Reminder 2`, `⚠️ Reminder 3`, `🚨 Reminder 4`.
+3. Pilih `🔔 Reminder 2` → cek tulisan merah/hijau di bawah tombol: *"🔖 Reminder 2 akan otomatis
+   ditandai "done"…"*, lalu **Kirim via WhatsApp**.
+4. Kembali ke tabel → badge kolom **Reminder 2** di baris itu sudah `done ✓` tanpa perlu reload;
+   grafik **Progress Pengiriman & Reminder** di Dashboard ikut bertambah.
+5. Kalau tombol template baru belum muncul, lakukan **hard refresh** (`Ctrl+Shift+R`, di HP: tutup
+   tab lalu buka lagi). Pada rilis ini versi aset dinaikkan ke `?v=28`, jadi file lama tidak akan
+   dipakai lagi.
 
-> Tidak ada perubahan pada `server.js` dan struktur `data/db.json` pada rilis ini, sehingga data
-> pelanggan yang sudah ada aman. Tetap jalankan backup `data/` seperti langkah di atas.
+> Tidak ada perubahan struktur `data/db.json` pada rilis ini, sehingga data pelanggan yang sudah ada
+> aman. Tetap jalankan backup `data/` seperti langkah di atas — kebiasaan yang baik sebelum update.
+
 
 > Folder `data/` dan file `data/db.json` tidak terpengaruh oleh `git pull` karena di-ignore
 > Git. Backup tetap disarankan karena aplikasi akan menjalankan migrasi ringan ketika versi
