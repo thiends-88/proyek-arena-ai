@@ -50,6 +50,26 @@ Di halaman **Data Pelanggan** ada dropdown **View data** untuk mengatur berapa b
 - Baris pagination menampilkan rentang yang sedang dilihat, mis. `Menampilkan 21–40 dari 137 data · halaman 2 / 7 · 20 per halaman`. Tombol `‹` `›` hanya muncul bila datanya lebih dari satu halaman.
 - Mengganti pilihan view otomatis kembali ke halaman 1 supaya tidak ada halaman kosong.
 
+### 💬 Template pesan WhatsApp
+Tombol **💬 Kirim Pesan** di tiap baris Data Pelanggan membuka modal berisi 7 template yang isinya
+diambil otomatis dari baris tersebut (nama, ID, nominal tagihan, bulan tagihan, kolektor, tanggal jatuh tempo):
+
+`Konfirmasi Pembayaran` · `Cek Kendala Layanan` · `Pengumuman Tagihan Bulanan` · `🔔 Reminder 1` · `🔔 Reminder 2` · `⚠️ Reminder 3` · `🚨 Reminder 4`
+
+- **Tanggal jatuh tempo** dihitung dari satu konstanta: `public/app.js` → `TANGGAL_JATUH_TEMPO`
+  (bawaan **20**, rentang aman 1–28). Tagihan bulan `YYYY-MM` jatuh tempo pada tanggal 20 di bulan
+  berikutnya, jadi teks pesan benar sendiri setiap bulan tanpa perlu diedit.
+- **Reminder 1–4 otomatis ditandai `done`.** Mengirim pesan memakai salah satu template reminder
+  akan mencentang kolom reminder terkait pada baris itu (disimpan server, jadi konsisten di semua
+  perangkat); tombol template yang terpilih ditandai, dan ada keterangan kolom mana yang akan
+  tercentang sebelum kirim. Template lain tidak mengubah kolom apa pun.
+- **Reminder 4** sengaja mengosongkan nominalnya (`Rp [ISI NOMINAL TUNGGAKAN]`) karena tunggakan bisa
+  gabungan beberapa bulan — pesan ditolak sampai tulisan itu diganti. Batas akhirnya memakai hari
+  terakhir bulan jatuh tempo (28–31, otomatis termasuk tahun kabisat).
+- Nama format lama `(PG000163) NAMA (Aktif)` dibersihkan otomatis menjadi `NAMA` di dalam pesan.
+- 8 pesan terakhir muncul di kartu **Pesan Terakhir** pada Dashboard, lengkap dengan label reminder
+  yang baru dikirim.
+
 ### 🔧 Menambah / memindah / menghapus kolom
 Cukup edit **satu array di dua file** (urutan array = urutan tampilan):
 - `public/app.js` → `PELANGGAN_FIELDS` (label, tipe, `size: 'full'|'half'`, `def`, `required`)

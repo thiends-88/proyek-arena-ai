@@ -796,6 +796,10 @@ app.delete('/api/pelanggan/:id', requireAuth, (req, res) => {
 });
 
 // --- Pesan (WhatsApp) ---
+// Kirim template reminder → kolom "reminder1..4" baris itu ikut ditandai 'done'
+// (otomatis, tanpa perlu klik badge di tabel lagi).
+const REMINDER_FIELD_BY_NOMOR = { 1: 'reminder1', 2: 'reminder2', 3: 'reminder3', 4: 'reminder4' };
+
 app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
   const p = findPelangganRecord(req.params.id);
   if (!p) return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
@@ -804,10 +808,17 @@ app.post('/api/pelanggan/:id/message', requireAuth, (req, res) => {
   }
   const teks = String(req.body.teks || '').trim();
   if (!teks) return res.status(400).json({ error: 'Pesan tidak boleh kosong.' });
+  const nomor = Number(req.body.reminder);
+  const field = REMINDER_FIELD_BY_NOMOR[nomor] || null;
   const msg = { id: uid('msg'), pelangganId: recordKey(p), kolektorId: req.user.id, teks, waktu: new Date().toISOString() };
+  const markedDone = [];
+  if (field) {
+    msg.reminder = nomor;
+    if (p[field] !== 'done') { p[field] = 'done'; markedDone.push(field); }
+  }
   db.pesan.push(msg);
   saveDB(db);
-  res.json({ ok: true, wa: waLink(p.noHp, teks) });
+  res.json({ ok: true, wa: waLink(p.noHp, teks), reminderDone: field ? { nomor, field } : null, markedDone });
 });
 
 app.get('/api/pesan', requireAuth, (req, res) => {
