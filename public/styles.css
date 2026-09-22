@@ -175,6 +175,8 @@ code { background: #e2e8f0; padding: 1px 6px; border-radius: 6px; font-size: .85
 .btn-danger:hover { background: #fecaca; }
 .btn-ghost { background: #f1f5f9; color: #334155; }
 .btn-ghost:hover { background: #e2e8f0; }
+/* Template pesan yang sedang dipilih di modal "Kirim Pesan" */
+.btn-ghost.active { background: var(--primary); color: #fff; }
 .btn-sm { padding: 6px 10px; font-size: 12.5px; border-radius: 8px; }
 .btn-block { width: 100%; justify-content: center; }
 .btn:disabled { opacity: .6; cursor: not-allowed; }

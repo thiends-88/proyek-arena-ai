@@ -643,7 +643,7 @@ async function renderDashboard() {
         <div class="card-head"><div><div class="card-title">Pesan Terakhir</div><div class="card-sub">Riwayat kirim pesan WA</div></div></div>
         ${d.recentPesan.length ? d.recentPesan.slice(0, 4).map((m) => `
           <div class="msg-bubble" style="margin-bottom:8px">${esc(m.teks)}
-            <div class="msg-meta">→ ${esc(m.pelangganNama)} · ${esc(m.kolektorNama)} · ${new Date(m.waktu).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="msg-meta">→ ${esc(m.pelangganNama)} · ${esc(m.kolektorNama)} · ${new Date(m.waktu).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${m.reminder ? ` · <strong>🔔 Reminder ${m.reminder} → done ✓</strong>` : ''}</div>
           </div>`).join('') : '<div class="hint">Belum ada pesan.</div>'}
       </div></div>
       ${isAdmin ? `
@@ -1369,14 +1369,20 @@ async function deletePelanggan(id) {
 // Nama bulan dalam Bahasa Indonesia — dipakai template tagihan agar bulan menyesuaikan otomatis.
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-// Template pengumuman tagihan bulanan: bulan pemakaian = bulan lalu, masa bayar = bulan ini (1 s/d 10).
+// Tanggal jatuh tempo tagihan — berlaku setiap bulan.
+// Ganti angkanya saja kalau suatu saat jatuh tempo dipindah (mis. 25).
+// Pakai rentang 1..28 agar tanggalnya tetap ada di semua bulan, termasuk Februari.
+const TANGGAL_JATUH_TEMPO = 20;
+
+// Template pengumuman tagihan bulanan: bulan pemakaian = bulan lalu, masa bayar = bulan ini
+// (tanggal 1 s/d TANGGAL_JATUH_TEMPO).
 function tagihanBulananTemplate() {
   const now = new Date();
   const tahun = now.getFullYear();
-  const bulanIni = BULAN_ID[now.getMonth()];
-  const bulanLalu = BULAN_ID[(now.getMonth() + 11) % 12];
+  const bulanIni = BULAN_ID[now.getMonth()].toUpperCase();
+  const bulanLalu = BULAN_ID[(now.getMonth() + 11) % 12].toUpperCase();
   return [
-    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu.toUpperCase()} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni.toUpperCase()} ${tahun} dan jatuh tempo pada tanggal 10 ${bulanIni.toUpperCase()} ${tahun}`,
+    `Assalamualaikum, dari CinoxmediaNet, kembali memberitahukan kepada bapak/ibu bahwa tagihan internet pemakaian ${bulanLalu} sudah diterbitkan dan sudah dapat dibayarkan per tanggal 1 ${bulanIni} ${tahun} dan jatuh tempo pada tanggal ${TANGGAL_JATUH_TEMPO} ${bulanIni} ${tahun}`,
     '',
     'Pembayaran ke kantor buka setiap hari senin-sabtu pada jam kerja (08:00-17:00).',
     'BAYAR KE KANTOR AKAN DIKENAKAN BIAYA ADMIN 5000',
@@ -1387,6 +1393,147 @@ function tagihanBulananTemplate() {
   ].join('\n');
 }
 
+// Nama untuk sapaan di pesan. Format data lama kadang masih "KODE" + status,
+// mis. "(PG000163) PENGADILAN AGAMA SOLOK (Aktif)" → disederhanakan jadi
+// "PENGADILAN AGAMA SOLOK". Bila kosong, fallback ke ID pelanggan.
+function namaSapaan(p) {
+  const s = String((p && p.nama) || '')
+    .replace(/^\s*\([^)]*\)\s*/, '')
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim();
+  return s || (p && p.id) || 'Bapak/Ibu';
+}
+
+// Bulan jatuh tempo untuk satu baris pelanggan: bulan berikutnya dari bulan tagihan
+// (disimpan sebagai YYYY-MM). Bila bulan tagihan kosong/tidak terbaca, bulan berjalan.
+// Menghasilkan { tahun, idx } dengan idx = indeks 0-based array BULAN_ID.
+function bulanJatuhTempo(p) {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String((p && p.bulanTagihan) || ''));
+  if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) {
+    const bulan = Number(m[2]);
+    return { tahun: bulan === 12 ? Number(m[1]) + 1 : Number(m[1]), idx: bulan % 12 };
+  }
+  const now = new Date();
+  return { tahun: now.getFullYear(), idx: now.getMonth() };
+}
+
+// Label tanggal jatuh tempo: TANGGAL_JATUH_TEMPO di bulan tagihan berikutnya.
+function jatuhTempoLabel(p) {
+  const { tahun, idx } = bulanJatuhTempo(p);
+  return `${TANGGAL_JATUH_TEMPO} ${BULAN_ID[idx]} ${tahun}`;
+}
+
+// Batas akhir penagihan = hari terakhir bulan jatuh tempo (28–31, otomatis per bulan).
+// Dipakai Reminder 4, yang dikirim saat tanggal 20 sudah terlewat.
+function batasAkhirBulanLabel(p) {
+  const { tahun, idx } = bulanJatuhTempo(p);
+  const hariTerakhir = new Date(tahun, idx + 1, 0).getDate();
+  return `${hariTerakhir} ${BULAN_ID[idx]} ${tahun}`;
+}
+
+// Nama kolektor untuk diucapkan di pesan: pakai kolektor pemilik data; bila tidak
+// ada (mis. admin melihat data tanpa kolektor) pakai nama akun yang login.
+function namaKolektorPesan(p) {
+  return (p && p.kolektorNama && p.kolektorNama !== '-')
+    ? p.kolektorNama
+    : ((state.user && state.user.name) || 'tim kolektor');
+}
+
+// "September 2026" dari bulan tagihan (disimpan sebagai YYYY-MM); '' bila kosong.
+function bulanTagihanLabel(p) {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String((p && p.bulanTagihan) || ''));
+  return m && Number(m[2]) >= 1 && Number(m[2]) <= 12
+    ? `${BULAN_ID[Number(m[2]) - 1]} ${m[1]}`
+    : '';
+}
+
+// Template "Reminder 1" — pengingat sopan bahwa tagihan belum dibayar.
+// Semua isian diambil dari baris yang dipilih (nama, ID, nominal, kolektor, jatuh tempo).
+function reminder1Template(p) {
+  const kolektor = namaKolektorPesan(p);
+  const bulanTagihan = bulanTagihanLabel(p);
+  return [
+    `Halo Bapak/Ibu *${namaSapaan(p)}* 👋`,
+    '',
+    `Saya ${kolektor} dari *Cinoxmedianet* ingin mengingatkan bahwa tagihan layanan internet${bulanTagihan ? ` bulan *${bulanTagihan}*` : ''} Bapak/Ibu tercatat *belum dibayarkan.*`,
+    '',
+    `📌 ID Pelanggan: *${p.id || '-'}*`,
+    `💰 Total Tagihan: *${fmtRp(p.jumlahTagihan)}*`,
+    '',
+    `Mohon dibantu melakukan pembayaran sebelum tanggal jatuh tempo *${jatuhTempoLabel(p)}* agar layanan internet tetap dapat digunakan dengan lancar. 😊`,
+    '',
+    'Jika pembayaran sudah dilakukan, silakan abaikan pesan ini.',
+    '',
+    'Terima kasih atas perhatian dan kepercayaannya kepada *Cinoxmedianet*. 🙏',
+  ].join('\n');
+}
+
+// Template "Reminder 2" — nada lebih tegas karena sudah diingatkan lebih dari sekali.
+function reminder2Template(p) {
+  const bulan = bulanTagihanLabel(p);
+  return [
+    `Halo Bapak/Ibu *${namaSapaan(p)}* 🙏`,
+    '',
+    `Kami ingin menginformasikan bahwa pembayaran tagihan internet${bulan ? ` bulan *${bulan}*` : ''} Bapak/Ibu dengan ID Pelanggan *${p.id || '-'}* hingga saat ini *belum kami terima.*`,
+    '',
+    `💰 Total Tagihan: *${fmtRp(p.jumlahTagihan)}*`,
+    `📅 Jatuh Tempo: tanggal *${jatuhTempoLabel(p)}*`,
+    '',
+    'Mohon bantuan Bapak/Ibu untuk melakukan pembayaran agar layanan internet tetap aktif dan dapat digunakan dengan baik.',
+    '',
+    'Apabila pembayaran sudah dilakukan, mohon abaikan pesan ini atau kirimkan bukti pembayaran kepada kami untuk pengecekan.',
+    '',
+    'Terima kasih atas kerja samanya. 🙏',
+  ].join('\n');
+}
+
+// Template "Reminder 3" — nada paling tegas: lewat jatuh tempo jaringan terblokir.
+function reminder3Template(p) {
+  const bulan = bulanTagihanLabel(p);
+  return [
+    `Halo Bapak/Ibu *${namaSapaan(p)}*,`,
+    '',
+    `Kami kembali menghubungi terkait tagihan layanan internet${bulan ? ` bulan *${bulan}*` : ''} dengan rincian:`,
+    '',
+    `📌 ID Pelanggan: *${p.id || '-'}*`,
+    `💰 Tagihan: *${fmtRp(p.jumlahTagihan)}*`,
+    `📅 Jatuh Tempo: tanggal *${jatuhTempoLabel(p)}*`,
+    '⏰ Status: *Belum tercatat pembayarannya*',
+    '',
+    'Mohon kesediaan Bapak/Ibu untuk segera melakukan pembayaran agar layanan tetap dapat digunakan karena jika sudah lewat tanggal jatuh tempo maka jaringan akan terblokir sesuai ketentuan layanan.',
+    '',
+    'Jika pembayaran telah dilakukan, silakan kirimkan bukti pembayaran kepada Customer Service kami.',
+    '',
+    'Terima kasih atas perhatian dan kerja samanya. 🙏',
+  ].join('\n');
+}
+
+// Nominal pada Reminder 4 sengaja tidak diambil dari kolom Total: tunggakan bisa
+// gabungan beberapa bulan, jadi kolektor mengisinya manual sebelum mengirim.
+const PLACEHOLDER_NOMINAL = '[ISI NOMINAL TUNGGAKAN]';
+
+// Template "Reminder 4" — teguran terakhir: sudah lewat jatuh tempo, perangkat
+// dijadwalkan ditarik. Batas akhir otomatis = hari terakhir bulan jatuh tempo.
+function reminder4Template(p) {
+  return [
+    '*PERINGATAN TAGIHAN TERTUNGGAK*',
+    '',
+    `Yth. Bapak/Ibu ${namaSapaan(p)},`,
+    '',
+    `Kami mengingatkan bahwa tagihan layanan internet dengan nomor pelanggan *${p.id || '-'}* saat ini telah melewati jatuh tempo dan masih terdapat tunggakan sebesar Rp ${PLACEHOLDER_NOMINAL}.`,
+    '',
+    'Sampai dengan saat ini, kami belum menerima pembayaran atas tagihan tersebut.',
+    '',
+    'Apabila pembayaran tidak segera dilakukan, maka sesuai ketentuan layanan, perangkat internet yang terpasang di lokasi akan *dijadwalkan untuk dilakukan penarikan oleh tim kami*.',
+    '',
+    `Mohon segera melakukan pembayaran paling lambat *${batasAkhirBulanLabel(p)}* untuk menghindari proses penarikan perangkat.`,
+    '',
+    'Setelah melakukan pembayaran, mohon mengirimkan bukti pembayaran melalui WhatsApp ini agar dapat kami lakukan pengecekan dan pembaharuan status tagihan.',
+    '',
+    'Terima kasih atas perhatian dan kerja samanya.',
+  ].join('\n');
+}
+
 function openMessageModal(id) {
   const p = state.pelanggan.find((x) => recordId(x) === id || x.id === id);
   if (!p) return;
@@ -1394,7 +1541,13 @@ function openMessageModal(id) {
     { label: 'Konfirmasi Pembayaran', text: `Assalamualaikum Bpk/Ibu ${p.nama}, mohon maaf mengganggu. Terkait pembayaran internet Anda sebesar ${fmtRp(p.jumlahTagihan)}, mohon konfirmasinya. Terima kasih.` },
     { label: 'Cek Kendala Layanan', text: `Halo Bpk/Ibu ${p.nama}, ini dari tim kolektor. Apakah ada kendala pada layanan internet Anda? Silakan balas pesan ini. Terima kasih.` },
     { label: 'Pengumuman Tagihan Bulanan', text: tagihanBulananTemplate() },
+    { label: '🔔 Reminder 1', text: reminder1Template(p), reminder: 1 },
+    { label: '🔔 Reminder 2', text: reminder2Template(p), reminder: 2 },
+    { label: '⚠️ Reminder 3', text: reminder3Template(p), reminder: 3 },
+    { label: '🚨 Reminder 4', text: reminder4Template(p), reminder: 4 },
   ];
+  // Template yang sedang dipilih; menentukan kolom reminder mana yang ditandai done.
+  let tplAktif = 0;
   openModal(`
     <div class="modal-head"><h3>💬 Kirim Pesan</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
@@ -1411,24 +1564,57 @@ function openMessageModal(id) {
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px" id="msg-templates">
         ${templates.map((t, i) => `<button type="button" class="btn btn-ghost btn-sm" data-idx="${i}">${esc(t.label)}</button>`).join('')}
       </div>
-      <div class="hint" style="margin-top:8px">ℹ️ Template "Pengumuman Tagihan Bulanan" otomatis menyesuaikan bulan pemakaian &amp; masa bayar sesuai tanggal saat ini.</div>
+      <div class="hint" id="msg-tpl-info" style="margin-top:8px"></div>
+      <div class="hint" style="margin-top:8px">ℹ️ Semua template reminder otomatis mengisi nama, ID, nominal, bulan tagihan, dan tanggal jatuh tempo (setiap tanggal ${TANGGAL_JATUH_TEMPO}) sesuai baris yang dipilih.<br>✍️ Khusus "Reminder 4": nominal tunggakan diisi manual (bisa gabungan beberapa bulan) — ganti tulisan <strong>${PLACEHOLDER_NOMINAL}</strong> dengan angkanya saja, "Rp" sudah ada di depannya. Pesan tidak bisa terkirim sebelum tulisan itu diganti.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-accent" id="msg-send">💬 Kirim via WhatsApp</button>
     </div>`);
-  document.querySelectorAll('#msg-templates button').forEach((b) => {
-    b.addEventListener('click', () => { $('#msg-teks').value = templates[Number(b.dataset.idx)].text; });
+  const tplTombol = Array.from(document.querySelectorAll('#msg-templates button'));
+  const infoEl = () => $('#msg-tpl-info');
+  const tandaiTplAktif = () => {
+    tplTombol.forEach((b) => b.classList.toggle('active', Number(b.dataset.idx) === tplAktif));
+    const t = templates[tplAktif];
+    const el = infoEl();
+    if (el) el.textContent = t.reminder
+      ? `🔖 Reminder ${t.reminder} akan otomatis ditandai "done" di baris ini saat pesan dikirim.`
+      : 'Template ini tidak mengubah kolom reminder.';
+  };
+  tplTombol.forEach((b) => {
+    b.addEventListener('click', () => {
+      tplAktif = Number(b.dataset.idx);
+      $('#msg-teks').value = templates[tplAktif].text;
+      tandaiTplAktif();
+    });
   });
+  tandaiTplAktif();   // tampilkan status reminder untuk template yang terpilih awal
   $('#msg-send').addEventListener('click', async () => {
     const teks = $('#msg-teks').value.trim();
     const errEl = $('#msg-error');
     errEl.classList.add('hidden');
     if (!teks) { errEl.textContent = 'Pesan tidak boleh kosong.'; errEl.classList.remove('hidden'); return; }
+    // Cegah "Reminder 4" terkirim dengan nominal masih berupa teks isian.
+    if (teks.includes(PLACEHOLDER_NOMINAL)) {
+      errEl.textContent = `Nominal tunggakan belum diisi. Ganti "${PLACEHOLDER_NOMINAL}" dengan jumlahnya dulu.`;
+      errEl.classList.remove('hidden');
+      $('#msg-teks').focus();
+      return;
+    }
     try {
-      const r = await api('/api/pelanggan/' + enc(recordId(p)) + '/message', { method: 'POST', body: JSON.stringify({ teks }) });
+      const r = await api('/api/pelanggan/' + enc(recordId(p)) + '/message', {
+        method: 'POST',
+        body: JSON.stringify({ teks, reminder: templates[tplAktif].reminder || null }),
+      });
+      // Sinkronkan badge tabel dengan hasil server tanpa reload.
+      if (r.reminderDone && p[r.reminderDone.field] !== 'done') {
+        p[r.reminderDone.field] = 'done';
+        renderPelangganTable();
+      }
       closeModal();
-      toast('Pesan tercatat. Membuka WhatsApp…');
+      toast(r.reminderDone
+        ? `Pesan tercatat · Reminder ${r.reminderDone.nomor} → done ✓ · Membuka WhatsApp…`
+        : 'Pesan tercatat. Membuka WhatsApp…');
       window.open(r.wa, '_blank');
     } catch (e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
   });
